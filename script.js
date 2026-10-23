@@ -1,75 +1,253 @@
-// Initialize state
-const STORAGE_KEY = 'tasks_app_data';
+/**
+ * Simple Task Manager — Full-Stack Application Logic
+ * Integrates Supabase Auth & PostgreSQL with Row Level Security (RLS)
+ */
+
+// ==================== STATE MANAGEMENT ====================
+let supabaseClient = null;
+let currentUser = null;
 let tasks = [];
 let currentView = 'inbox';
 let currentFilter = 'all';
+let searchQuery = '';
+let currentSort = 'created_desc';
+let isAuthModeLogin = true;
 
-// DOM Elements - initialized after DOM is ready
-let taskInput, addBtn, taskList, menuBtn, sidebar, overlay;
-let navItems, filterBtns;
+// DOM Elements
+let authScreen, mainApp, authForm, authSubmitBtn, authAlert, authTabs;
+let loginTab, signupTab, authToggleBtn, authToggleText, nameFieldGroup, passwordHint;
+let emailInput, passwordInput, fullNameInput;
+let configWarning, setupUrl, setupKey, saveConfigBtn;
+let userAvatar, userEmailDisplay, workspaceName, logoutBtn, mobileLogoutBtn;
+let taskInput, taskPriority, taskDueDate, taskDescription, addBtn, toggleDetailsBtn, taskOptionsPanel;
+let taskList, loadingIndicator, searchInput, clearSearchBtn, sortSelect, filterBtns, navItems;
+let statTotal, statCompleted, statPending, statOverdue, progressPercentage, progressBarFill;
+let inboxCount, todayCount, upcomingCount, sidebarOverdueCount;
 let pageTitle, pageSubtitle, pageEmoji;
-let inboxCount, todayCount, upcomingCount;
+let menuBtn, sidebar, overlay;
+let editModal, editTaskForm, editTaskId, editTaskTitle, editTaskDescription, editTaskPriority, editTaskDueDate, closeEditModalBtn, cancelEditBtn;
+let toastContainer;
 
-// Initialize the app
-function init() {
-  // Get DOM elements
+// ==================== INITIALIZATION ====================
+document.addEventListener('DOMContentLoaded', initApp);
+
+async function initApp() {
+  cacheDOMElements();
+  setupEventListeners();
+
+  // Initialize Supabase Client
+  const initialized = initSupabase();
+  if (!initialized) {
+    showAuthScreen();
+    if (configWarning) configWarning.style.display = 'block';
+    return;
+  }
+
+  // Check initial authentication session
+  try {
+    const { data: { session }, error } = await supabaseClient.auth.getSession();
+    if (error) {
+      console.error('Session retrieval error:', error);
+      showAuthScreen();
+      return;
+    }
+
+    if (session && session.user) {
+      onUserSignedIn(session.user);
+    } else {
+      showAuthScreen();
+    }
+
+    // Listen for auth state changes (login, logout, session refresh)
+    supabaseClient.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        onUserSignedIn(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        onUserSignedOut();
+      }
+    });
+
+  } catch (err) {
+    console.error('Error during auth check:', err);
+    showAuthScreen();
+  }
+}
+
+// ==================== DOM CACHING ====================
+function cacheDOMElements() {
+  authScreen = document.getElementById('authScreen');
+  mainApp = document.getElementById('mainApp');
+  authForm = document.getElementById('authForm');
+  authSubmitBtn = document.getElementById('authSubmitBtn');
+  authAlert = document.getElementById('authAlert');
+  loginTab = document.getElementById('loginTab');
+  signupTab = document.getElementById('signupTab');
+  authToggleBtn = document.getElementById('authToggleBtn');
+  authToggleText = document.getElementById('authToggleText');
+  nameFieldGroup = document.getElementById('nameFieldGroup');
+  passwordHint = document.getElementById('passwordHint');
+  emailInput = document.getElementById('emailInput');
+  passwordInput = document.getElementById('passwordInput');
+  fullNameInput = document.getElementById('fullNameInput');
+
+  configWarning = document.getElementById('configWarning');
+  setupUrl = document.getElementById('setupUrl');
+  setupKey = document.getElementById('setupKey');
+  saveConfigBtn = document.getElementById('saveConfigBtn');
+
+  userAvatar = document.getElementById('userAvatar');
+  userEmailDisplay = document.getElementById('userEmailDisplay');
+  workspaceName = document.getElementById('workspaceName');
+  logoutBtn = document.getElementById('logoutBtn');
+  mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
+
   taskInput = document.getElementById('taskInput');
+  taskPriority = document.getElementById('taskPriority');
+  taskDueDate = document.getElementById('taskDueDate');
+  taskDescription = document.getElementById('taskDescription');
   addBtn = document.getElementById('addBtn');
+  toggleDetailsBtn = document.getElementById('toggleDetailsBtn');
+  taskOptionsPanel = document.getElementById('taskOptionsPanel');
+
   taskList = document.getElementById('taskList');
-  menuBtn = document.getElementById('menuBtn');
-  sidebar = document.getElementById('sidebar');
-  overlay = document.getElementById('overlay');
-  navItems = document.querySelectorAll('.nav-item');
+  loadingIndicator = document.getElementById('loadingIndicator');
+  searchInput = document.getElementById('searchInput');
+  clearSearchBtn = document.getElementById('clearSearchBtn');
+  sortSelect = document.getElementById('sortSelect');
   filterBtns = document.querySelectorAll('.filter-btn');
-  pageTitle = document.getElementById('pageTitle');
-  pageSubtitle = document.getElementById('pageSubtitle');
-  pageEmoji = document.getElementById('pageEmoji');
+  navItems = document.querySelectorAll('.nav-item');
+
+  statTotal = document.getElementById('statTotal');
+  statCompleted = document.getElementById('statCompleted');
+  statPending = document.getElementById('statPending');
+  statOverdue = document.getElementById('statOverdue');
+  progressPercentage = document.getElementById('progressPercentage');
+  progressBarFill = document.getElementById('progressBarFill');
+
   inboxCount = document.getElementById('inboxCount');
   todayCount = document.getElementById('todayCount');
   upcomingCount = document.getElementById('upcomingCount');
+  sidebarOverdueCount = document.getElementById('sidebarOverdueCount');
 
-  // Load tasks from localStorage
-  loadTasks();
+  pageTitle = document.getElementById('pageTitle');
+  pageSubtitle = document.getElementById('pageSubtitle');
+  pageEmoji = document.getElementById('pageEmoji');
 
-  // Set up event listeners
-  setupEventListeners();
+  menuBtn = document.getElementById('menuBtn');
+  sidebar = document.getElementById('sidebar');
+  overlay = document.getElementById('overlay');
 
-  // Initial render
-  renderTasks();
-  updateCounts();
-}
+  editModal = document.getElementById('editModal');
+  editTaskForm = document.getElementById('editTaskForm');
+  editTaskId = document.getElementById('editTaskId');
+  editTaskTitle = document.getElementById('editTaskTitle');
+  editTaskDescription = document.getElementById('editTaskDescription');
+  editTaskPriority = document.getElementById('editTaskPriority');
+  editTaskDueDate = document.getElementById('editTaskDueDate');
+  closeEditModalBtn = document.getElementById('closeEditModalBtn');
+  cancelEditBtn = document.getElementById('cancelEditBtn');
 
-// Load tasks from localStorage
-function loadTasks() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      tasks = JSON.parse(stored);
-    }
-  } catch (e) {
-    console.error('Error loading tasks:', e);
-    tasks = [];
+  toastContainer = document.getElementById('toastContainer');
+
+  // Set default due date in composer to today
+  if (taskDueDate) {
+    taskDueDate.value = getTodayDateString();
   }
 }
 
-// Save tasks to localStorage
-function saveTasks() {
+// ==================== SUPABASE INITIALIZATION ====================
+function initSupabase() {
+  if (typeof window.supabase === 'undefined') {
+    console.error('Supabase client library not loaded. Check script tag in index.html.');
+    return false;
+  }
+
+  // Check stored keys or config.js keys
+  const storedUrl = localStorage.getItem('supabase_url');
+  const storedKey = localStorage.getItem('supabase_anon_key');
+  const configUrl = window.SUPABASE_CONFIG?.url;
+  const configKey = window.SUPABASE_CONFIG?.anonKey;
+
+  const url = storedUrl || (configUrl && !configUrl.includes('YOUR_SUPABASE_PROJECT_URL') ? configUrl : null);
+  const anonKey = storedKey || (configKey && !configKey.includes('YOUR_SUPABASE_ANON_KEY') ? configKey : null);
+
+  if (!url || !anonKey) {
+    return false;
+  }
+
+  // Clean trailing slashes and /rest/v1 if included
+  const cleanUrl = url.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
+  const cleanAnonKey = anonKey.trim().replace(/_SUPABASE_ANON_KEY$/, '');
+
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-  } catch (e) {
-    console.error('Error saving tasks:', e);
+    supabaseClient = window.supabase.createClient(cleanUrl, cleanAnonKey, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to create Supabase client:', err);
+    return false;
   }
 }
 
-// Set up all event listeners
+// ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
-  // Add task
-  addBtn.addEventListener('click', addTask);
-  taskInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') addTask();
-  });
+  // Config save helper
+  if (saveConfigBtn) {
+    saveConfigBtn.addEventListener('click', () => {
+      const url = setupUrl.value.trim();
+      const key = setupKey.value.trim();
+      if (!url || !key) {
+        alert('Please provide both your Supabase URL and public anon key.');
+        return;
+      }
+      localStorage.setItem('supabase_url', url);
+      localStorage.setItem('supabase_anon_key', key);
+      window.location.reload();
+    });
+  }
 
-  // Navigation
+  // Auth Tabs & Toggle
+  if (loginTab) loginTab.addEventListener('click', () => setAuthMode(true));
+  if (signupTab) signupTab.addEventListener('click', () => setAuthMode(false));
+  if (authToggleBtn) {
+    authToggleBtn.addEventListener('click', () => setAuthMode(!isAuthModeLogin));
+  }
+
+  // Auth Form Submit
+  if (authForm) {
+    authForm.addEventListener('submit', handleAuthSubmit);
+  }
+
+  // Logout buttons
+  if (logoutBtn) logoutBtn.addEventListener('click', handleSignOut);
+  if (mobileLogoutBtn) mobileLogoutBtn.addEventListener('click', handleSignOut);
+
+  // Task Options toggle
+  if (toggleDetailsBtn) {
+    toggleDetailsBtn.addEventListener('click', () => {
+      const isHidden = taskOptionsPanel.style.display === 'none';
+      taskOptionsPanel.style.display = isHidden ? 'block' : 'none';
+      toggleDetailsBtn.classList.toggle('active', isHidden);
+    });
+  }
+
+  // Add Task
+  if (addBtn) addBtn.addEventListener('click', handleAddTask);
+  if (taskInput) {
+    taskInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddTask();
+      }
+    });
+  }
+
+  // Navigation Items
   navItems.forEach(item => {
     item.addEventListener('click', () => handleNavClick(item));
     item.addEventListener('keypress', (e) => {
@@ -80,17 +258,675 @@ function setupEventListeners() {
     });
   });
 
-  // Filters
+  // Filter Buttons
   filterBtns.forEach(btn => {
     btn.addEventListener('click', () => handleFilterClick(btn));
   });
 
+  // Search input
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      searchQuery = e.target.value.trim().toLowerCase();
+      if (clearSearchBtn) {
+        clearSearchBtn.style.display = searchQuery ? 'block' : 'none';
+      }
+      renderTasks();
+    });
+  }
+
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      searchInput.value = '';
+      searchQuery = '';
+      clearSearchBtn.style.display = 'none';
+      renderTasks();
+    });
+  }
+
+  // Sort dropdown
+  if (sortSelect) {
+    sortSelect.addEventListener('change', (e) => {
+      currentSort = e.target.value;
+      renderTasks();
+    });
+  }
+
+  // Edit Modal events
+  if (closeEditModalBtn) closeEditModalBtn.addEventListener('click', closeEditModal);
+  if (cancelEditBtn) cancelEditBtn.addEventListener('click', closeEditModal);
+  if (editTaskForm) editTaskForm.addEventListener('submit', handleSaveEditedTask);
+  if (editModal) {
+    editModal.addEventListener('click', (e) => {
+      if (e.target === editModal) closeEditModal();
+    });
+  }
+
   // Mobile menu
-  menuBtn.addEventListener('click', toggleSidebar);
-  overlay.addEventListener('click', closeSidebar);
+  if (menuBtn) menuBtn.addEventListener('click', toggleSidebar);
+  if (overlay) overlay.addEventListener('click', closeSidebar);
 }
 
-// Handle navigation click
+// ==================== AUTHENTICATION FLOWS ====================
+function setAuthMode(isLogin) {
+  isAuthModeLogin = isLogin;
+  hideAuthAlert();
+
+  if (isLogin) {
+    loginTab.classList.add('active');
+    signupTab.classList.remove('active');
+    nameFieldGroup.style.display = 'none';
+    passwordHint.style.display = 'none';
+    authSubmitBtn.querySelector('.btn-text').textContent = 'Sign In';
+    authToggleText.textContent = "Don't have an account?";
+    authToggleBtn.textContent = 'Register now';
+    passwordInput.setAttribute('autocomplete', 'current-password');
+  } else {
+    loginTab.classList.remove('active');
+    signupTab.classList.add('active');
+    nameFieldGroup.style.display = 'block';
+    passwordHint.style.display = 'block';
+    authSubmitBtn.querySelector('.btn-text').textContent = 'Create Account';
+    authToggleText.textContent = 'Already have an account?';
+    authToggleBtn.textContent = 'Sign in here';
+    passwordInput.setAttribute('autocomplete', 'new-password');
+  }
+}
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  hideAuthAlert();
+
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+  const fullName = fullNameInput ? fullNameInput.value.trim() : '';
+
+  if (!email || !password) {
+    showAuthAlert('Please fill in all required fields.', 'error');
+    return;
+  }
+
+  setAuthLoading(true);
+
+  try {
+    if (isAuthModeLogin) {
+      // Sign in
+      const { data, error } = await supabaseClient.auth.signInWithPassword({
+        email,
+        password
+      });
+
+      if (error) {
+        showAuthAlert(error.message, 'error');
+        setAuthLoading(false);
+        return;
+      }
+
+      showToast('Welcome back!', 'success');
+      onUserSignedIn(data.user);
+    } else {
+      // Register
+      const { data, error } = await supabaseClient.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName || email.split('@')[0]
+          }
+        }
+      });
+
+      if (error) {
+        showAuthAlert(error.message, 'error');
+        setAuthLoading(false);
+        return;
+      }
+
+      if (data?.session) {
+        showToast('Registration successful! Welcome.', 'success');
+        onUserSignedIn(data.user);
+      } else if (data?.user) {
+        showAuthAlert('Registration successful! Please check your email to confirm your account.', 'success');
+        setAuthLoading(false);
+      }
+    }
+  } catch (err) {
+    console.error('Unexpected auth error:', err);
+    showAuthAlert('An unexpected error occurred. Please try again.', 'error');
+    setAuthLoading(false);
+  }
+}
+
+async function handleSignOut() {
+  try {
+    if (supabaseClient) {
+      await supabaseClient.auth.signOut();
+    }
+  } catch (err) {
+    console.error('Error signing out:', err);
+  } finally {
+    onUserSignedOut();
+  }
+}
+
+function onUserSignedIn(user) {
+  currentUser = user;
+  setAuthLoading(false);
+  authScreen.style.display = 'none';
+  mainApp.style.display = 'flex';
+
+  // Display user information
+  const displayName = user.user_metadata?.full_name || user.email.split('@')[0];
+  if (userAvatar) userAvatar.textContent = displayName.charAt(0).toUpperCase();
+  if (userEmailDisplay) userEmailDisplay.textContent = user.email;
+  if (workspaceName) workspaceName.textContent = `${displayName}'s Workspace`;
+
+  // Fetch tasks for the authenticated user from PostgreSQL
+  fetchTasks();
+}
+
+function onUserSignedOut() {
+  currentUser = null;
+  tasks = [];
+  mainApp.style.display = 'none';
+  authScreen.style.display = 'flex';
+  emailInput.value = '';
+  passwordInput.value = '';
+  hideAuthAlert();
+  if (window.innerWidth <= 768) closeSidebar();
+}
+
+function showAuthScreen() {
+  if (mainApp) mainApp.style.display = 'none';
+  if (authScreen) authScreen.style.display = 'flex';
+}
+
+function showAuthAlert(msg, type = 'error') {
+  if (!authAlert) return;
+  authAlert.textContent = msg;
+  authAlert.className = `auth-alert ${type}`;
+  authAlert.style.display = 'block';
+}
+
+function hideAuthAlert() {
+  if (authAlert) authAlert.style.display = 'none';
+}
+
+function setAuthLoading(loading) {
+  if (!authSubmitBtn) return;
+  const btnText = authSubmitBtn.querySelector('.btn-text');
+  const btnSpinner = authSubmitBtn.querySelector('.btn-spinner');
+
+  authSubmitBtn.disabled = loading;
+  if (loading) {
+    if (btnText) btnText.textContent = isAuthModeLogin ? 'Signing In...' : 'Creating Account...';
+    if (btnSpinner) btnSpinner.style.display = 'inline-block';
+  } else {
+    if (btnText) btnText.textContent = isAuthModeLogin ? 'Sign In' : 'Create Account';
+    if (btnSpinner) btnSpinner.style.display = 'none';
+  }
+}
+
+// ==================== DATABASE CRUD OPERATIONS ====================
+async function fetchTasks() {
+  if (!supabaseClient || !currentUser) return;
+
+  showLoading(true);
+
+  try {
+    // Row Level Security automatically ensures only this user's tasks are returned
+    const { data, error } = await supabaseClient
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching tasks from Supabase:', error);
+      showToast('Could not load tasks from database: ' + error.message, 'error');
+      tasks = [];
+    } else {
+      tasks = data || [];
+    }
+
+    renderTasks();
+    updateDashboardStats();
+    updateSidebarCounts();
+
+  } catch (err) {
+    console.error('Database query failed:', err);
+    showToast('Network error while connecting to Supabase.', 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function handleAddTask() {
+  const title = taskInput.value.trim();
+  if (!title) {
+    taskInput.focus();
+    return;
+  }
+
+  if (!currentUser || !supabaseClient) {
+    showToast('Please sign in to add tasks.', 'error');
+    return;
+  }
+
+  const priority = taskPriority ? taskPriority.value : 'Medium';
+  const dueDate = taskDueDate && taskDueDate.value ? taskDueDate.value : null;
+  const description = taskDescription && taskDescription.value.trim() ? taskDescription.value.trim() : null;
+
+  addBtn.disabled = true;
+
+  try {
+    const newTaskPayload = {
+      user_id: currentUser.id,
+      title: title,
+      description: description,
+      priority: priority,
+      status: 'Pending',
+      due_date: dueDate
+    };
+
+    const { data, error } = await supabaseClient
+      .from('tasks')
+      .insert([newTaskPayload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error inserting task:', error);
+      showToast('Failed to save task: ' + error.message, 'error');
+      return;
+    }
+
+    // Prepend new task to local state
+    tasks.unshift(data);
+
+    // Reset input fields
+    taskInput.value = '';
+    if (taskDescription) taskDescription.value = '';
+    if (taskPriority) taskPriority.value = 'Medium';
+    if (taskDueDate) taskDueDate.value = getTodayDateString();
+    if (taskOptionsPanel) taskOptionsPanel.style.display = 'none';
+    if (toggleDetailsBtn) toggleDetailsBtn.classList.remove('active');
+
+    renderTasks();
+    updateDashboardStats();
+    updateSidebarCounts();
+    showToast('Task added successfully.', 'success');
+
+  } catch (err) {
+    console.error('Unexpected error creating task:', err);
+    showToast('Failed to connect to database.', 'error');
+  } finally {
+    addBtn.disabled = false;
+  }
+}
+
+async function toggleTaskStatus(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task || !supabaseClient) return;
+
+  const previousStatus = task.status;
+  const newStatus = previousStatus === 'Completed' ? 'Pending' : 'Completed';
+
+  // Optimistic UI update
+  task.status = newStatus;
+  renderTasks();
+  updateDashboardStats();
+  updateSidebarCounts();
+
+  try {
+    const { error } = await supabaseClient
+      .from('tasks')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating status:', error);
+      // Revert on failure
+      task.status = previousStatus;
+      renderTasks();
+      updateDashboardStats();
+      updateSidebarCounts();
+      showToast('Failed to update task status: ' + error.message, 'error');
+    }
+  } catch (err) {
+    console.error('Error during status toggle:', err);
+    task.status = previousStatus;
+    renderTasks();
+    updateDashboardStats();
+    updateSidebarCounts();
+    showToast('Network error while updating task.', 'error');
+  }
+}
+
+async function deleteTask(id) {
+  const taskEl = document.querySelector(`[data-id="${id}"]`);
+  if (taskEl) {
+    taskEl.classList.add('removing');
+  }
+
+  try {
+    const { error } = await supabaseClient
+      .from('tasks')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting task:', error);
+      if (taskEl) taskEl.classList.remove('removing');
+      showToast('Failed to delete task: ' + error.message, 'error');
+      return;
+    }
+
+    tasks = tasks.filter(t => t.id !== id);
+    renderTasks();
+    updateDashboardStats();
+    updateSidebarCounts();
+    showToast('Task deleted.', 'info');
+
+  } catch (err) {
+    console.error('Error deleting task:', err);
+    if (taskEl) taskEl.classList.remove('removing');
+    showToast('Network error while deleting task.', 'error');
+  }
+}
+
+function openEditModal(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+
+  editTaskId.value = task.id;
+  editTaskTitle.value = task.title;
+  editTaskDescription.value = task.description || '';
+  editTaskPriority.value = task.priority || 'Medium';
+  editTaskDueDate.value = task.due_date || '';
+
+  editModal.style.display = 'flex';
+  editTaskTitle.focus();
+}
+
+function closeEditModal() {
+  if (editModal) editModal.style.display = 'none';
+}
+
+async function handleSaveEditedTask(e) {
+  e.preventDefault();
+
+  const id = editTaskId.value;
+  const title = editTaskTitle.value.trim();
+  const description = editTaskDescription.value.trim() || null;
+  const priority = editTaskPriority.value;
+  const dueDate = editTaskDueDate.value || null;
+
+  if (!title) {
+    alert('Task title cannot be empty.');
+    return;
+  }
+
+  const saveBtn = document.getElementById('saveEditBtn');
+  if (saveBtn) saveBtn.disabled = true;
+
+  try {
+    const { data, error } = await supabaseClient
+      .from('tasks')
+      .update({
+        title: title,
+        description: description,
+        priority: priority,
+        due_date: dueDate
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating task:', error);
+      showToast('Failed to update task: ' + error.message, 'error');
+      return;
+    }
+
+    // Update in local array
+    const index = tasks.findIndex(t => t.id === id);
+    if (index !== -1) {
+      tasks[index] = data;
+    }
+
+    closeEditModal();
+    renderTasks();
+    updateDashboardStats();
+    updateSidebarCounts();
+    showToast('Task updated successfully.', 'success');
+
+  } catch (err) {
+    console.error('Error saving edited task:', err);
+    showToast('Network error while saving changes.', 'error');
+  } finally {
+    if (saveBtn) saveBtn.disabled = false;
+  }
+}
+
+// ==================== FILTERING & SORTING LOGIC ====================
+function getFilteredAndSortedTasks() {
+  const todayStr = getTodayDateString();
+  const nextWeekStr = getNextWeekDateString();
+
+  let result = [...tasks];
+
+  // 1. Navigation View Filter
+  if (currentView === 'today') {
+    result = result.filter(t => t.due_date === todayStr);
+  } else if (currentView === 'upcoming') {
+    result = result.filter(t => t.due_date && t.due_date > todayStr && t.due_date <= nextWeekStr);
+  } else if (currentView === 'overdue') {
+    result = result.filter(t => t.status === 'Pending' && t.due_date && t.due_date < todayStr);
+  }
+
+  // 2. Status Button Filter
+  if (currentFilter === 'pending') {
+    result = result.filter(t => t.status === 'Pending');
+  } else if (currentFilter === 'completed') {
+    result = result.filter(t => t.status === 'Completed');
+  } else if (currentFilter === 'overdue') {
+    result = result.filter(t => t.status === 'Pending' && t.due_date && t.due_date < todayStr);
+  }
+
+  // 3. Search Query
+  if (searchQuery) {
+    result = result.filter(t => {
+      const matchTitle = t.title.toLowerCase().includes(searchQuery);
+      const matchDesc = t.description ? t.description.toLowerCase().includes(searchQuery) : false;
+      return matchTitle || matchDesc;
+    });
+  }
+
+  // 4. Sorting
+  result.sort((a, b) => {
+    if (currentSort === 'created_desc') {
+      return new Date(b.created_at) - new Date(a.created_at);
+    } else if (currentSort === 'created_asc') {
+      return new Date(a.created_at) - new Date(b.created_at);
+    } else if (currentSort === 'due_date_asc') {
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return a.due_date.localeCompare(b.due_date);
+    } else if (currentSort === 'priority_desc') {
+      const priorityWeight = { High: 3, Medium: 2, Low: 1 };
+      return (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0);
+    }
+    return 0;
+  });
+
+  return result;
+}
+
+// ==================== RENDERING ====================
+function renderTasks() {
+  if (!taskList) return;
+
+  const filteredTasks = getFilteredAndSortedTasks();
+
+  if (filteredTasks.length === 0) {
+    let emptyMsg = 'No tasks yet';
+    let emptySub = 'Add a task above to get started';
+
+    if (searchQuery) {
+      emptyMsg = 'No matching tasks';
+      emptySub = `No results found for "${escapeHTML(searchQuery)}"`;
+    } else if (currentFilter === 'overdue' || currentView === 'overdue') {
+      emptyMsg = 'No overdue tasks 🎉';
+      emptySub = 'You are completely caught up!';
+    } else if (currentFilter === 'completed') {
+      emptyMsg = 'No completed tasks';
+      emptySub = 'Check off tasks as you finish them';
+    } else if (currentView === 'today') {
+      emptyMsg = 'No tasks due today';
+      emptySub = 'Enjoy your day or plan ahead';
+    }
+
+    taskList.innerHTML = `
+      <div class="empty-state">
+        <svg class="empty-state-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+        </svg>
+        <div class="empty-state-text">${emptyMsg}</div>
+        <div class="empty-state-subtext">${emptySub}</div>
+      </div>
+    `;
+    return;
+  }
+
+  taskList.innerHTML = filteredTasks.map(task => createTaskHTML(task)).join('');
+
+  // Attach event listeners to task elements
+  taskList.querySelectorAll('.task-item').forEach(taskEl => {
+    const id = taskEl.dataset.id;
+    const checkbox = taskEl.querySelector('input[type="checkbox"]');
+    const deleteBtn = taskEl.querySelector('.delete-btn');
+    const editBtn = taskEl.querySelector('.edit-btn');
+
+    if (checkbox) {
+      checkbox.addEventListener('change', () => toggleTaskStatus(id));
+    }
+    if (deleteBtn) {
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteTask(id);
+      });
+    }
+    if (editBtn) {
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openEditModal(id);
+      });
+    }
+  });
+}
+
+function createTaskHTML(task) {
+  const isCompleted = task.status === 'Completed';
+  const todayStr = getTodayDateString();
+  const isOverdue = !isCompleted && task.due_date && task.due_date < todayStr;
+
+  // Format Due Date Display
+  let dueDateBadge = '';
+  if (task.due_date) {
+    const formattedDate = formatDisplayDate(task.due_date);
+    const overdueClass = isOverdue ? 'is-overdue' : '';
+    dueDateBadge = `<span class="task-date-badge ${overdueClass}">${isOverdue ? '⚠️ Overdue: ' : '📅 '}${formattedDate}</span>`;
+  }
+
+  // Priority Badge
+  const priorityClass = `priority-${(task.priority || 'medium').toLowerCase()}`;
+  const priorityBadge = `<span class="priority-badge ${priorityClass}">${escapeHTML(task.priority || 'Medium')}</span>`;
+
+  // Optional description snippet
+  const descHTML = task.description 
+    ? `<span class="task-description">${escapeHTML(task.description)}</span>` 
+    : '';
+
+  return `
+    <div class="task-item ${isCompleted ? 'completed' : ''}" data-id="${task.id}">
+      <label class="checkbox-wrapper">
+        <input type="checkbox" ${isCompleted ? 'checked' : ''} aria-label="Mark task as ${isCompleted ? 'incomplete' : 'complete'}">
+        <div class="checkbox-custom">
+          <svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+        </div>
+      </label>
+
+      <div class="task-content-body">
+        <span class="task-title">${escapeHTML(task.title)}</span>
+        ${descHTML}
+        <div class="task-meta-row">
+          ${priorityBadge}
+          ${dueDateBadge}
+        </div>
+      </div>
+
+      <div class="task-actions">
+        <button class="action-icon-btn edit-btn" title="Edit task" aria-label="Edit task">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+        </button>
+        <button class="action-icon-btn delete-btn" title="Delete task" aria-label="Delete task">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ==================== DASHBOARD & STATS LOGIC ====================
+function updateDashboardStats() {
+  const todayStr = getTodayDateString();
+
+  const total = tasks.length;
+  const completed = tasks.filter(t => t.status === 'Completed').length;
+  const pending = tasks.filter(t => t.status === 'Pending').length;
+  const overdue = tasks.filter(t => t.status === 'Pending' && t.due_date && t.due_date < todayStr).length;
+
+  if (statTotal) statTotal.textContent = total;
+  if (statCompleted) statCompleted.textContent = completed;
+  if (statPending) statPending.textContent = pending;
+  if (statOverdue) statOverdue.textContent = overdue;
+
+  // Safe percentage calculation (0% if total === 0)
+  const percentage = total === 0 ? 0 : Math.round((completed / total) * 100);
+
+  if (progressPercentage) progressPercentage.textContent = `${percentage}%`;
+  if (progressBarFill) progressBarFill.style.width = `${percentage}%`;
+}
+
+function updateSidebarCounts() {
+  const todayStr = getTodayDateString();
+  const nextWeekStr = getNextWeekDateString();
+
+  const activeTasks = tasks.filter(t => t.status === 'Pending');
+
+  // Inbox count (all pending)
+  if (inboxCount) inboxCount.textContent = activeTasks.length;
+
+  // Today count
+  const todayTasks = activeTasks.filter(t => t.due_date === todayStr);
+  if (todayCount) todayCount.textContent = todayTasks.length;
+
+  // Upcoming count (tomorrow to next week)
+  const upcomingTasks = activeTasks.filter(t => t.due_date && t.due_date > todayStr && t.due_date <= nextWeekStr);
+  if (upcomingCount) upcomingCount.textContent = upcomingTasks.length;
+
+  // Overdue count
+  const overdueTasks = activeTasks.filter(t => t.due_date && t.due_date < todayStr);
+  if (sidebarOverdueCount) sidebarOverdueCount.textContent = overdueTasks.length;
+}
+
+// ==================== NAVIGATION & VIEW HANDLING ====================
 function handleNavClick(item) {
   const view = item.dataset.view;
   currentView = view;
@@ -106,7 +942,6 @@ function handleNavClick(item) {
   }
 }
 
-// Handle filter click
 function handleFilterClick(btn) {
   currentFilter = btn.dataset.filter;
   filterBtns.forEach(b => b.classList.remove('active'));
@@ -114,218 +949,97 @@ function handleFilterClick(btn) {
   renderTasks();
 }
 
-// Update page header based on view
 function updatePageHeader() {
   const titles = {
-    inbox:    { emoji: '📥', title: 'Inbox',    subtitle: 'All your tasks in one place' },
+    inbox:    { emoji: '📥', title: 'Inbox',    subtitle: 'All your tasks securely stored in PostgreSQL' },
     today:    { emoji: '📅', title: 'Today',    subtitle: 'Focus on what matters today'  },
-    upcoming: { emoji: '⏳', title: 'Upcoming', subtitle: 'Plan ahead for the week'       }
+    upcoming: { emoji: '⏳', title: 'Upcoming', subtitle: 'Plan ahead for the next 7 days' },
+    overdue:  { emoji: '⚠️', title: 'Overdue',  subtitle: 'Tasks that require immediate attention' }
   };
 
-  const current = titles[currentView];
+  const current = titles[currentView] || titles.inbox;
   if (pageEmoji) pageEmoji.textContent = current.emoji;
-  pageTitle.textContent = current.title;
-  pageSubtitle.textContent = current.subtitle;
+  if (pageTitle) pageTitle.textContent = current.title;
+  if (pageSubtitle) pageSubtitle.textContent = current.subtitle;
 }
 
-// Toggle sidebar (mobile)
 function toggleSidebar() {
-  sidebar.classList.toggle('open');
-  overlay.classList.toggle('active');
+  if (sidebar) sidebar.classList.toggle('open');
+  if (overlay) overlay.classList.toggle('active');
 }
 
-// Close sidebar
 function closeSidebar() {
-  sidebar.classList.remove('open');
-  overlay.classList.remove('active');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('active');
 }
 
-// Add a new task
-function addTask() {
-  const text = taskInput.value.trim();
-  if (!text) return;
-
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
-  const task = {
-    id: Date.now(),
-    text: text,
-    completed: false,
-    createdAt: today.toISOString(),
-    dueDate: currentView === 'today' ? today.toISOString() : 
-             currentView === 'upcoming' ? nextWeek.toISOString() : tomorrow.toISOString()
-  };
-
-  tasks.unshift(task);
-  taskInput.value = '';
-  saveTasks();
-  renderTasks();
-  updateCounts();
-}
-
-// Toggle task completion
-function toggleTask(id) {
-  const task = tasks.find(t => t.id === id);
-  if (task) {
-    task.completed = !task.completed;
-    saveTasks();
-    renderTasks();
-    updateCounts();
+function showLoading(show) {
+  if (loadingIndicator) {
+    loadingIndicator.style.display = show ? 'flex' : 'none';
   }
 }
 
-// Delete task
-function deleteTask(id) {
-  const taskEl = document.querySelector(`[data-id="${id}"]`);
-  if (taskEl) {
-    taskEl.classList.add('removing');
+// ==================== TOAST & UTILITIES ====================
+function showToast(message, type = 'info') {
+  if (!toastContainer) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+
+  toastContainer.appendChild(toast);
+
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(8px)';
     setTimeout(() => {
-      tasks = tasks.filter(t => t.id !== id);
-      saveTasks();
-      renderTasks();
-      updateCounts();
-    }, 300);
-  }
+      if (toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 200);
+  }, 3200);
 }
 
-// Get filtered tasks based on view and filter
-function getFilteredTasks() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
-  let filtered = [...tasks];
-
-  // Filter by view
-  if (currentView === 'today') {
-    filtered = filtered.filter(task => {
-      const dueDate = new Date(task.dueDate);
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate.getTime() === today.getTime();
-    });
-  } else if (currentView === 'upcoming') {
-    filtered = filtered.filter(task => {
-      const dueDate = new Date(task.dueDate);
-      return dueDate > today && dueDate <= nextWeek;
-    });
-  }
-
-  // Filter by status
-  if (currentFilter === 'active') {
-    filtered = filtered.filter(task => !task.completed);
-  } else if (currentFilter === 'completed') {
-    filtered = filtered.filter(task => task.completed);
-  }
-
-  return filtered;
-}
-
-// Render tasks
-function renderTasks() {
-  const filtered = getFilteredTasks();
-
-  if (filtered.length === 0) {
-    taskList.innerHTML = `
-      <div class="empty-state">
-        <svg class="empty-state-icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
-        </svg>
-        <div class="empty-state-text">No tasks yet</div>
-        <div class="empty-state-subtext">Add a task to get started</div>
-      </div>
-    `;
-    return;
-  }
-
-  taskList.innerHTML = filtered.map(task => createTaskHTML(task)).join('');
-
-  // Add event listeners to task elements
-  taskList.querySelectorAll('.task-item').forEach(taskEl => {
-    const id = parseInt(taskEl.dataset.id);
-    const checkbox = taskEl.querySelector('input[type="checkbox"]');
-    const deleteBtn = taskEl.querySelector('.delete-btn');
-
-    checkbox.addEventListener('change', () => toggleTask(id));
-    deleteBtn.addEventListener('click', () => deleteTask(id));
-  });
-}
-
-// Create task HTML
-function createTaskHTML(task) {
-  const dueDate = new Date(task.dueDate);
-  const formattedDate = dueDate.toLocaleDateString('en-US', { 
-    month: 'short', 
-    day: 'numeric' 
-  });
-
-  return `
-    <div class="task-item ${task.completed ? 'completed' : ''}" data-id="${task.id}">
-      <label class="checkbox-wrapper">
-        <input type="checkbox" ${task.completed ? 'checked' : ''} aria-label="Mark task as ${task.completed ? 'incomplete' : 'complete'}">
-        <div class="checkbox-custom">
-          <svg fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-        </div>
-      </label>
-      <span class="task-text">${escapeHTML(task.text)}</span>
-      <span class="task-date">${formattedDate}</span>
-      <button class="delete-btn" aria-label="Delete task">
-        <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path>
-        </svg>
-      </button>
-    </div>
-  `;
-}
-
-// Escape HTML to prevent XSS
 function escapeHTML(str) {
+  if (!str) return '';
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
 }
 
-// Update task counts
-function updateCounts() {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  
-  const nextWeek = new Date(today);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
-  const active = tasks.filter(t => !t.completed);
-
-  // Inbox count (all active)
-  inboxCount.textContent = active.length;
-
-  // Today count
-  const todayTasks = active.filter(task => {
-    const dueDate = new Date(task.dueDate);
-    dueDate.setHours(0, 0, 0, 0);
-    return dueDate.getTime() === today.getTime();
-  });
-  todayCount.textContent = todayTasks.length;
-
-  // Upcoming count
-  const upcomingTasks = active.filter(task => {
-    const dueDate = new Date(task.dueDate);
-    return dueDate > today && dueDate <= nextWeek;
-  });
-  upcomingCount.textContent = upcomingTasks.length;
+function getTodayDateString() {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
-// Initialize when DOM is ready
-document.addEventListener('DOMContentLoaded', init);
+function getNextWeekDateString() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDisplayDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const date = new Date(year, month, day);
+
+    const todayStr = getTodayDateString();
+    if (dateStr === todayStr) return 'Today';
+
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
+    if (dateStr === tomorrowStr) return 'Tomorrow';
+
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+  return dateStr;
+}

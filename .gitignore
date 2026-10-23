@@ -1,0 +1,17 @@
+# Supabase client configuration with project credentials
+config.js
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Scratch & logs
+scratch/
+*.log

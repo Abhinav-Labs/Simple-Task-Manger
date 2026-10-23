@@ -31,8 +31,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Generate config.js from secrets or fallback
+        run: |
+          if [ -n "${{ secrets.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "window.SUPABASE_CONFIG = { url: '${{ secrets.SUPABASE_URL }}', anonKey: '${{ secrets.SUPABASE_ANON_KEY }}' };" > config.js
+          elif [ ! -f config.js ]; then
+            echo "window.SUPABASE_CONFIG = { url: '', anonKey: '' };" > config.js
+          fi
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
