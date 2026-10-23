@@ -530,12 +530,41 @@ body {
   text-overflow: ellipsis;
 }
 
+.sidebar-email-container {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow: hidden;
+}
+
 .user-email-display {
   font-size: 11px;
   color: var(--text-tertiary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+.sidebar-email-toggle-btn {
+  background: transparent;
+  border: none;
+  padding: 2px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.sidebar-email-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg);
 }
 
 .nav-section {
@@ -961,6 +990,30 @@ body {
 
 .option-select:focus, .option-date:focus, .option-textarea:focus {
   border-color: var(--accent);
+}
+
+/* Clickable Date Picker on Entire Box */
+.clickable-date-input, .option-date, input[type="date"] {
+  cursor: pointer !important;
+}
+
+.clickable-date-input::-webkit-calendar-picker-indicator,
+.option-date::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer !important;
+  opacity: 0.75;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.clickable-date-input:hover::-webkit-calendar-picker-indicator,
+.option-date:hover::-webkit-calendar-picker-indicator,
+input[type="date"]:hover::-webkit-calendar-picker-indicator {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.date-field-wrapper {
+  cursor: pointer;
 }
 
 .option-textarea {
@@ -1605,6 +1658,10 @@ body {
 }
 
 .settings-inline-form .form-input {
+  flex: 1;
+}
+
+.settings-inline-form .password-input-wrapper {
   flex: 1;
 }
 

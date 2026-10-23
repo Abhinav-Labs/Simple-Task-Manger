@@ -173,7 +173,19 @@
         <div class="workspace-avatar" id="userAvatar">T</div>
         <div class="workspace-info">
           <span class="logo" id="workspaceName">My Workspace</span>
-          <span class="user-email-display" id="userEmailDisplay">Loading...</span>
+          <div class="sidebar-email-container">
+            <span class="user-email-display" id="userEmailDisplay">Loading...</span>
+            <button type="button" class="sidebar-email-toggle-btn" id="toggleMainEmailBtn" title="Show email" aria-label="Toggle email display">
+              <svg class="eye-open" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+              <svg class="eye-closed" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display: none;">
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
+                <line x1="1" y1="1" x2="23" y2="23"></line>
+              </svg>
+            </button>
+          </div>
         </div>
         <button class="sidebar-toggle-btn" id="collapseSidebarBtn" title="Close sidebar (or drag left)" aria-label="Close sidebar">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -374,9 +386,9 @@
                 </select>
               </div>
 
-              <div class="option-field">
+              <div class="option-field date-field-wrapper">
                 <label for="taskDueDate">Due Date</label>
-                <input type="date" id="taskDueDate" class="option-date">
+                <input type="date" id="taskDueDate" class="option-date clickable-date-input" title="Click anywhere to open calendar">
               </div>
             </div>
 
@@ -489,9 +501,9 @@
             </select>
           </div>
 
-          <div class="form-group">
+          <div class="form-group date-field-wrapper">
             <label for="editTaskDueDate">Due Date</label>
-            <input type="date" id="editTaskDueDate" class="form-input">
+            <input type="date" id="editTaskDueDate" class="form-input clickable-date-input" title="Click anywhere to open calendar">
           </div>
         </div>
 
@@ -543,7 +555,19 @@
             </div>
           </div>
           <form id="settingsEmailForm" class="settings-inline-form">
-            <input type="email" id="settingsEmailInput" class="form-input" placeholder="new-email@example.com" required>
+            <div class="password-input-wrapper">
+              <input type="password" id="settingsEmailInput" class="form-input" placeholder="new-email@example.com" required autocomplete="email">
+              <button type="button" class="password-toggle-btn" id="toggleSettingsEmailBtn" aria-label="Toggle email visibility" title="Show email">
+                <svg class="eye-open" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <svg class="eye-closed" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display: none;">
+                  <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                </svg>
+              </button>
+            </div>
             <button type="submit" class="btn btn-primary" id="saveEmailBtn">
               <span class="btn-text">Update Email</span>
               <span class="btn-spinner" style="display: none;"></span>

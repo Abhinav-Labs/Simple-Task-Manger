@@ -20,7 +20,8 @@ let authScreen, mainApp, authForm, authSubmitBtn, authAlert, authTabs;
 let loginTab, signupTab, authToggleBtn, authToggleText, nameFieldGroup, passwordHint;
 let emailInput, passwordInput, fullNameInput;
 let configWarning, setupUrl, setupKey, saveConfigBtn;
-let userAvatar, userEmailDisplay, workspaceName, logoutBtn, mobileLogoutBtn;
+let userAvatar, userEmailDisplay, toggleMainEmailBtn, workspaceName, logoutBtn, mobileLogoutBtn;
+let isMainEmailVisible = false;
 let taskInput, taskPriority, taskCategory, taskDueDate, taskDescription, addBtn, toggleDetailsBtn, taskOptionsPanel;
 let taskList, loadingIndicator, searchInput, clearSearchBtn, sortSelect, filterBtns, categoryPills, navItems;
 let statTotal, statCompleted, statPending, statOverdue, progressPercentage, progressBarFill;
@@ -165,6 +166,7 @@ function cacheDOMElements() {
 
   userAvatar = document.getElementById('userAvatar');
   userEmailDisplay = document.getElementById('userEmailDisplay');
+  toggleMainEmailBtn = document.getElementById('toggleMainEmailBtn');
   workspaceName = document.getElementById('workspaceName');
   logoutBtn = document.getElementById('logoutBtn');
   mobileLogoutBtn = document.getElementById('mobileLogoutBtn');
@@ -525,8 +527,16 @@ function setupEventListeners() {
   // Setup sidebar mouse & touch drag handlers
   setupSidebarDrag();
 
-  // Setup password visibility toggles
+  // Setup password & email visibility toggles
   setupPasswordToggles();
+
+  // Setup sidebar email toggle
+  if (toggleMainEmailBtn) {
+    toggleMainEmailBtn.addEventListener('click', toggleMainEmailVisibility);
+  }
+
+  // Setup full-box click handlers for date inputs
+  setupDatePickerTriggers();
 
   // Escape key closes open modals
   document.addEventListener('keydown', (e) => {
@@ -550,13 +560,53 @@ function setupPasswordToggles() {
       if (!input) return;
 
       const isPassword = input.type === 'password';
-      input.type = isPassword ? 'text' : 'password';
-      btn.title = isPassword ? 'Hide password' : 'Show password';
+      const isEmailInput = input.id.toLowerCase().includes('email') || input.name === 'email';
+
+      if (isEmailInput) {
+        input.type = isPassword ? 'email' : 'password';
+        btn.title = isPassword ? 'Hide email' : 'Show email';
+      } else {
+        input.type = isPassword ? 'text' : 'password';
+        btn.title = isPassword ? 'Hide password' : 'Show password';
+      }
 
       if (eyeOpen) eyeOpen.style.display = isPassword ? 'none' : 'block';
       if (eyeClosed) eyeClosed.style.display = isPassword ? 'block' : 'none';
       input.focus();
     });
+  });
+}
+
+function setupDatePickerTriggers() {
+  const dateInputs = document.querySelectorAll('input[type="date"]');
+  dateInputs.forEach(input => {
+    // When clicking anywhere on the input element
+    input.addEventListener('click', () => {
+      if (typeof input.showPicker === 'function') {
+        try {
+          input.showPicker();
+        } catch (err) {
+          // Handled if already active
+        }
+      }
+    });
+
+    // Also support clicking anywhere in the container/label
+    const wrapper = input.closest('.date-field-wrapper');
+    if (wrapper) {
+      wrapper.addEventListener('click', (e) => {
+        if (e.target !== input) {
+          input.focus();
+          if (typeof input.showPicker === 'function') {
+            try {
+              input.showPicker();
+            } catch (err) {
+              // Handled
+            }
+          }
+        }
+      });
+    }
   });
 }
 
@@ -744,11 +794,53 @@ function setAuthLoading(loading) {
   }
 }
 
+function maskEmail(email) {
+  if (!email || typeof email !== 'string') return '••••••••';
+  const atIndex = email.indexOf('@');
+  if (atIndex === -1) return '••••••••';
+  const local = email.substring(0, atIndex);
+  const domain = email.substring(atIndex); // includes '@'
+  if (local.length <= 2) {
+    return local[0] + '••••' + domain;
+  }
+  return local[0] + '••••••' + local[local.length - 1] + domain;
+}
+
+function renderUserEmailDisplay() {
+  if (!userEmailDisplay) return;
+  const rawEmail = currentUser?.email || '';
+  if (!rawEmail) {
+    userEmailDisplay.textContent = 'Loading...';
+    return;
+  }
+
+  if (isMainEmailVisible) {
+    userEmailDisplay.textContent = rawEmail;
+    userEmailDisplay.title = rawEmail;
+  } else {
+    userEmailDisplay.textContent = maskEmail(rawEmail);
+    userEmailDisplay.title = 'Email is hidden (click eye icon to show)';
+  }
+
+  if (toggleMainEmailBtn) {
+    toggleMainEmailBtn.title = isMainEmailVisible ? 'Hide email' : 'Show email';
+    const eyeOpen = toggleMainEmailBtn.querySelector('.eye-open');
+    const eyeClosed = toggleMainEmailBtn.querySelector('.eye-closed');
+    if (eyeOpen) eyeOpen.style.display = isMainEmailVisible ? 'none' : 'block';
+    if (eyeClosed) eyeClosed.style.display = isMainEmailVisible ? 'block' : 'none';
+  }
+}
+
+function toggleMainEmailVisibility() {
+  isMainEmailVisible = !isMainEmailVisible;
+  renderUserEmailDisplay();
+}
+
 function updateUserDisplayInfo(user) {
   if (!user) return;
   const displayName = user.user_metadata?.full_name || user.email.split('@')[0];
   if (userAvatar) userAvatar.textContent = displayName.charAt(0).toUpperCase();
-  if (userEmailDisplay) userEmailDisplay.textContent = user.email;
+  renderUserEmailDisplay();
   if (workspaceName) workspaceName.textContent = `${displayName}'s Workspace`;
 }
 
@@ -761,6 +853,16 @@ function openSettingsModal() {
     }
     if (settingsEmailInput) {
       settingsEmailInput.value = currentUser.email || '';
+      // Default to masked/hidden per user requirements
+      settingsEmailInput.type = 'password';
+      const emailToggle = document.getElementById('toggleSettingsEmailBtn');
+      if (emailToggle) {
+        emailToggle.title = 'Show email';
+        const eyeOpen = emailToggle.querySelector('.eye-open');
+        const eyeClosed = emailToggle.querySelector('.eye-closed');
+        if (eyeOpen) eyeOpen.style.display = 'block';
+        if (eyeClosed) eyeClosed.style.display = 'none';
+      }
     }
   }
   if (settingsCurrentPasswordInput) settingsCurrentPasswordInput.value = '';
