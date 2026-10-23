@@ -524,6 +524,9 @@ function setupEventListeners() {
   // Setup sidebar mouse & touch drag handlers
   setupSidebarDrag();
 
+  // Setup password visibility toggles
+  setupPasswordToggles();
+
   // Escape key closes open modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -531,6 +534,28 @@ function setupEventListeners() {
       if (settingsModal && settingsModal.style.display === 'flex') closeSettingsModal();
       if (editModal && editModal.style.display === 'flex') closeEditModal();
     }
+  });
+}
+
+function setupPasswordToggles() {
+  document.querySelectorAll('.password-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      const wrapper = btn.closest('.password-input-wrapper');
+      if (!wrapper) return;
+      const input = wrapper.querySelector('input');
+      const eyeOpen = btn.querySelector('.eye-open');
+      const eyeClosed = btn.querySelector('.eye-closed');
+      if (!input) return;
+
+      const isPassword = input.type === 'password';
+      input.type = isPassword ? 'text' : 'password';
+      btn.title = isPassword ? 'Hide password' : 'Show password';
+
+      if (eyeOpen) eyeOpen.style.display = isPassword ? 'none' : 'block';
+      if (eyeClosed) eyeClosed.style.display = isPassword ? 'block' : 'none';
+      input.focus();
+    });
   });
 }
 

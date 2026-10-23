@@ -62,6 +62,18 @@
   background: #FFFFFF;
 }
 
+[data-theme="dark"] .auth-logo {
+  background: linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35) !important;
+}
+
+[data-theme="dark"] .workspace-avatar {
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%) !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4) !important;
+}
+
 [data-theme="dark"] .config-warning {
   background: #2b2210;
   border-color: #594212;
@@ -212,6 +224,46 @@ body {
   margin-top: 4px;
 }
 
+/* Password Visibility Toggle */
+.password-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.password-input-wrapper .form-input {
+  padding-right: 40px !important;
+  width: 100%;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition), background-color var(--transition);
+  z-index: 2;
+}
+
+.password-toggle-btn:hover {
+  color: var(--text-primary);
+  background: var(--hover-bg);
+}
+
+.password-toggle-btn:active {
+  transform: translateY(-50%) scale(0.92);
+}
+
 /* ==================== AUTHENTICATION SCREEN ==================== */
 .auth-screen {
   min-height: 100vh;
@@ -242,12 +294,13 @@ body {
   width: 44px;
   height: 44px;
   margin: 0 auto 12px;
-  background: var(--text-primary);
-  color: white;
-  border-radius: var(--radius);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
 .auth-title {
@@ -449,15 +502,16 @@ body {
 .workspace-avatar {
   width: 28px;
   height: 28px;
-  background: var(--text-primary);
-  color: white;
-  border-radius: 4px;
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+  color: #FFFFFF;
+  border-radius: 6px;
   font-size: 13px;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.2);
 }
 
 .workspace-info {
@@ -1663,23 +1717,74 @@ body {
 }
 
 .toast {
-  background: var(--text-primary);
-  color: white;
-  padding: 10px 16px;
-  border-radius: var(--radius);
-  font-size: 13px;
-  box-shadow: var(--shadow-md);
+  background: #18181B;
+  color: #FAFAFA;
+  padding: 11px 18px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   pointer-events: auto;
-  animation: toastIn 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  max-width: 320px;
+  animation: toastIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 380px;
+  line-height: 1.4;
+}
+
+.toast.warning {
+  background: #B45309;
+  color: #FFFFFF;
+  border-color: #D97706;
 }
 
 .toast.error {
-  background: var(--color-danger);
+  background: #DC2626;
+  color: #FFFFFF;
+  border-color: #EF4444;
 }
 
 .toast.success {
-  background: var(--color-success);
+  background: #059669;
+  color: #FFFFFF;
+  border-color: #10B981;
+}
+
+.toast.info {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #3B82F6;
+}
+
+/* Dark Mode Toast Overrides: High contrast, clearly readable */
+[data-theme="dark"] .toast {
+  background: #27272A;
+  color: #F4F4F5;
+  border: 1px solid #3F3F46;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="dark"] .toast.warning {
+  background: #78350F;
+  color: #FEF3C7;
+  border-color: #D97706;
+}
+
+[data-theme="dark"] .toast.error {
+  background: #7F1D1D;
+  color: #FEE2E2;
+  border-color: #EF4444;
+}
+
+[data-theme="dark"] .toast.success {
+  background: #064E3B;
+  color: #D1FAE5;
+  border-color: #10B981;
+}
+
+[data-theme="dark"] .toast.info {
+  background: #1E3A8A;
+  color: #DBEAFE;
+  border-color: #3B82F6;
 }
 
 @keyframes toastIn {
