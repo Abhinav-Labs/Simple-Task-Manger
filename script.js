@@ -35,7 +35,7 @@ let themeToggleBtn, themeToggleLabel, mobileThemeBtn, themeOptionLight, themeOpt
 let openSettingsBtn, mobileSettingsBtn, settingsModal, closeSettingsModalBtn;
 let settingsNameForm, settingsNameInput, saveNameBtn;
 let settingsEmailForm, settingsEmailInput, saveEmailBtn;
-let settingsPasswordForm, settingsPasswordInput, settingsConfirmPasswordInput, savePasswordBtn;
+let settingsPasswordForm, settingsCurrentPasswordInput, settingsPasswordInput, settingsConfirmPasswordInput, savePasswordBtn;
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', initApp);
@@ -234,6 +234,7 @@ function cacheDOMElements() {
   saveEmailBtn = document.getElementById('saveEmailBtn');
 
   settingsPasswordForm = document.getElementById('settingsPasswordForm');
+  settingsCurrentPasswordInput = document.getElementById('settingsCurrentPasswordInput');
   settingsPasswordInput = document.getElementById('settingsPasswordInput');
   settingsConfirmPasswordInput = document.getElementById('settingsConfirmPasswordInput');
   savePasswordBtn = document.getElementById('savePasswordBtn');
@@ -673,6 +674,7 @@ function openSettingsModal() {
       settingsEmailInput.value = currentUser.email || '';
     }
   }
+  if (settingsCurrentPasswordInput) settingsCurrentPasswordInput.value = '';
   if (settingsPasswordInput) settingsPasswordInput.value = '';
   if (settingsConfirmPasswordInput) settingsConfirmPasswordInput.value = '';
 
@@ -781,34 +783,69 @@ async function handleSavePassword(e) {
   e.preventDefault();
   if (!supabaseClient || !currentUser) return;
 
-  const newPass = settingsPasswordInput.value;
-  const confirmPass = settingsConfirmPasswordInput.value;
+  const currentPass = settingsCurrentPasswordInput ? settingsCurrentPasswordInput.value : '';
+  const newPass = settingsPasswordInput ? settingsPasswordInput.value : '';
+  const confirmPass = settingsConfirmPasswordInput ? settingsConfirmPasswordInput.value : '';
+
+  if (!currentPass) {
+    showToast('Please enter your current password.', 'error');
+    if (settingsCurrentPasswordInput) settingsCurrentPasswordInput.focus();
+    return;
+  }
 
   if (!newPass || newPass.length < 6) {
-    showToast('Password must be at least 6 characters long.', 'error');
+    showToast('New password must be at least 6 characters long.', 'error');
+    if (settingsPasswordInput) settingsPasswordInput.focus();
     return;
   }
 
   if (newPass !== confirmPass) {
-    showToast('Passwords do not match. Please re-enter.', 'error');
+    showToast('New passwords do not match. Please re-enter.', 'error');
+    if (settingsConfirmPasswordInput) settingsConfirmPasswordInput.focus();
     return;
   }
 
-  setBtnLoading(savePasswordBtn, true, 'Update Password', 'Updating...');
+  if (currentPass === newPass) {
+    showToast('New password must be different from current password.', 'error');
+    return;
+  }
+
+  setBtnLoading(savePasswordBtn, true, 'Update Password', 'Verifying...');
 
   try {
-    const { error } = await supabaseClient.auth.updateUser({
-      password: newPass
+    // 1. Verify the current password by re-authenticating
+    const { error: verifyError } = await supabaseClient.auth.signInWithPassword({
+      email: currentUser.email,
+      password: currentPass
     });
 
-    if (error) {
-      console.error('Error updating password:', error);
-      showToast('Failed to update password: ' + error.message, 'error');
+    if (verifyError) {
+      console.error('Current password verification failed:', verifyError);
+      showToast('Incorrect current password. Please try again.', 'error');
+      setBtnLoading(savePasswordBtn, false, 'Update Password');
+      if (settingsCurrentPasswordInput) {
+        settingsCurrentPasswordInput.select();
+      }
       return;
     }
 
-    settingsPasswordInput.value = '';
-    settingsConfirmPasswordInput.value = '';
+    setBtnLoading(savePasswordBtn, true, 'Update Password', 'Updating...');
+
+    // 2. Perform the secure password update with current_password included
+    const { error: updateError } = await supabaseClient.auth.updateUser({
+      password: newPass,
+      current_password: currentPass
+    });
+
+    if (updateError) {
+      console.error('Error updating password:', updateError);
+      showToast('Failed to update password: ' + updateError.message, 'error');
+      return;
+    }
+
+    if (settingsCurrentPasswordInput) settingsCurrentPasswordInput.value = '';
+    if (settingsPasswordInput) settingsPasswordInput.value = '';
+    if (settingsConfirmPasswordInput) settingsConfirmPasswordInput.value = '';
     showToast('Login password updated successfully!', 'success');
   } catch (err) {
     console.error('Unexpected error updating password:', err);
