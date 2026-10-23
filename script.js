@@ -24,7 +24,7 @@ let userAvatar, userEmailDisplay, workspaceName, logoutBtn, mobileLogoutBtn;
 let taskInput, taskPriority, taskCategory, taskDueDate, taskDescription, addBtn, toggleDetailsBtn, taskOptionsPanel;
 let taskList, loadingIndicator, searchInput, clearSearchBtn, sortSelect, filterBtns, categoryPills, navItems;
 let statTotal, statCompleted, statPending, statOverdue, progressPercentage, progressBarFill;
-let inboxCount, todayCount, upcomingCount, sidebarOverdueCount;
+let inboxCount, todayCount, upcomingCount, sidebarOverdueCount, sidebarCompletedCount;
 let pageTitle, pageSubtitle, pageEmoji;
 let menuBtn, sidebar, overlay;
 let collapseSidebarBtn, expandSidebarBtn, sidebarEdgeZone;
@@ -198,6 +198,7 @@ function cacheDOMElements() {
   todayCount = document.getElementById('todayCount');
   upcomingCount = document.getElementById('upcomingCount');
   sidebarOverdueCount = document.getElementById('sidebarOverdueCount');
+  sidebarCompletedCount = document.getElementById('sidebarCompletedCount');
 
   pageTitle = document.getElementById('pageTitle');
   pageSubtitle = document.getElementById('pageSubtitle');
@@ -404,9 +405,9 @@ function setupEventListeners() {
   if (mobileLogoutBtn) mobileLogoutBtn.addEventListener('click', openLogoutModal);
   if (cancelLogoutBtn) cancelLogoutBtn.addEventListener('click', closeLogoutModal);
   if (confirmLogoutBtn) {
-    confirmLogoutBtn.addEventListener('click', async () => {
-      closeLogoutModal();
-      await handleSignOut();
+    confirmLogoutBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleSignOut();
     });
   }
   if (logoutModal) {
@@ -650,15 +651,40 @@ async function handleAuthSubmit(e) {
 }
 
 async function handleSignOut() {
+  closeLogoutModal();
+  if (settingsModal) closeSettingsModal();
+  if (editModal) closeEditModal();
+
+  // 1. Immediately switch UI to logged out screen
+  onUserSignedOut();
+
+  // 2. Clear all Supabase session tokens from localStorage directly
   try {
-    if (supabaseClient) {
-      await supabaseClient.auth.signOut();
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('sb-') || key.includes('supabase.auth'))) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('Error clearing localStorage tokens:', e);
+  }
+
+  // 3. Inform Supabase client with race condition protection
+  try {
+    if (supabaseClient && supabaseClient.auth) {
+      await Promise.race([
+        supabaseClient.auth.signOut(),
+        new Promise(resolve => setTimeout(resolve, 800))
+      ]);
     }
   } catch (err) {
-    console.error('Error signing out:', err);
-  } finally {
-    onUserSignedOut();
+    console.warn('Supabase auth.signOut warning:', err);
   }
+
+  showToast('Logged out successfully.', 'info');
 }
 
 function onUserSignedIn(user) {
@@ -676,10 +702,10 @@ function onUserSignedIn(user) {
 function onUserSignedOut() {
   currentUser = null;
   tasks = [];
-  mainApp.style.display = 'none';
-  authScreen.style.display = 'flex';
-  emailInput.value = '';
-  passwordInput.value = '';
+  if (mainApp) mainApp.style.display = 'none';
+  if (authScreen) authScreen.style.display = 'flex';
+  if (emailInput) emailInput.value = '';
+  if (passwordInput) passwordInput.value = '';
   hideAuthAlert();
   if (window.innerWidth <= 768) closeSidebar();
 }
@@ -919,6 +945,33 @@ async function handleSavePassword(e) {
 }
 
 // ==================== DATABASE CRUD OPERATIONS ====================
+// Category encoding helper: if native category column is not yet added in Supabase PostgreSQL,
+// we safely preserve the category inside description as metadata tag so it persists in the database.
+function packCategoryIntoDescription(category, description) {
+  const clean = (description || '').replace(/^<!--cat:[^>]+-->\s*/, '').trim();
+  if (!category || category === 'General') {
+    return clean || null;
+  }
+  return `<!--cat:${category}-->${clean ? ' ' + clean : ''}`;
+}
+
+function unpackCategoryAndDescription(task) {
+  let category = task.category || 'General';
+  let description = task.description || '';
+
+  if (typeof description === 'string' && description.startsWith('<!--cat:')) {
+    const match = description.match(/^<!--cat:([^>]+)-->\s*(.*)/s);
+    if (match) {
+      if (!task.category || task.category === 'General') {
+        category = match[1].trim();
+      }
+      description = match[2] || '';
+    }
+  }
+
+  return { category, description };
+}
+
 async function fetchTasks() {
   if (!supabaseClient || !currentUser) return;
 
@@ -935,8 +988,18 @@ async function fetchTasks() {
       console.error('Error fetching tasks from Supabase:', error);
       showToast('Could not load tasks from database: ' + error.message, 'error');
       tasks = [];
+    } else if (data) {
+      // Decode category metadata from PostgreSQL rows
+      tasks = data.map(rawTask => {
+        const { category, description } = unpackCategoryAndDescription(rawTask);
+        return {
+          ...rawTask,
+          category: category,
+          description: description
+        };
+      });
     } else {
-      tasks = data || [];
+      tasks = [];
     }
 
     renderTasks();
@@ -1001,16 +1064,19 @@ async function handleAddTask() {
       .select()
       .single();
 
-    // Fallback if category column is not yet present in Supabase table
+    // Fallback if category column is not yet present in Supabase table:
+    // Store category in PostgreSQL description metadata so it is 100% saved in the backend!
     if (error && error.message && error.message.includes('category')) {
-      console.warn('Category column not detected in database. Retrying without category column...');
+      console.warn('Category column not detected in database. Saving category to PostgreSQL description metadata...');
       delete newTaskPayload.category;
+      newTaskPayload.description = packCategoryIntoDescription(category, description);
+
       const retryResult = await supabaseClient
         .from('tasks')
         .insert([newTaskPayload])
         .select()
         .single();
-      data = retryResult.data ? { ...retryResult.data, category: category } : null;
+      data = retryResult.data;
       error = retryResult.error;
     }
 
@@ -1019,6 +1085,11 @@ async function handleAddTask() {
       showToast('Failed to save task: ' + error.message, 'error');
       return;
     }
+
+    // Ensure clean category and description in client state
+    const unpacked = unpackCategoryAndDescription(data);
+    data.category = unpacked.category;
+    data.description = unpacked.description;
 
     // Prepend new task to local state
     tasks.unshift(data);
@@ -1183,16 +1254,19 @@ async function handleSaveEditedTask(e) {
       .select()
       .single();
 
-    // Fallback if category column does not exist
+    // Fallback if category column does not exist:
+    // Store category in PostgreSQL description metadata
     if (error && error.message && error.message.includes('category')) {
       delete updatePayload.category;
+      updatePayload.description = packCategoryIntoDescription(category, description);
+
       const retryResult = await supabaseClient
         .from('tasks')
         .update(updatePayload)
         .eq('id', id)
         .select()
         .single();
-      data = retryResult.data ? { ...retryResult.data, category: category } : null;
+      data = retryResult.data;
       error = retryResult.error;
     }
 
@@ -1201,6 +1275,10 @@ async function handleSaveEditedTask(e) {
       showToast('Failed to update task: ' + error.message, 'error');
       return;
     }
+
+    const unpacked = unpackCategoryAndDescription(data);
+    data.category = unpacked.category;
+    data.description = unpacked.description;
 
     // Update in local array
     const index = tasks.findIndex(t => t.id === id);
@@ -1236,6 +1314,8 @@ function getFilteredAndSortedTasks() {
     result = result.filter(t => t.due_date && t.due_date > todayStr && t.due_date <= nextWeekStr);
   } else if (currentView === 'overdue') {
     result = result.filter(t => t.status === 'Pending' && t.due_date && t.due_date < todayStr);
+  } else if (currentView === 'completed') {
+    result = result.filter(t => t.status === 'Completed');
   }
 
   // 2. Status Button Filter
@@ -1301,8 +1381,8 @@ function renderTasks() {
     } else if (currentFilter === 'overdue' || currentView === 'overdue') {
       emptyMsg = 'No overdue tasks 🎉';
       emptySub = 'You are completely caught up!';
-    } else if (currentFilter === 'completed') {
-      emptyMsg = 'No completed tasks';
+    } else if (currentFilter === 'completed' || currentView === 'completed') {
+      emptyMsg = 'No completed tasks yet';
       emptySub = 'Check off tasks as you finish them';
     } else if (currentView === 'today') {
       emptyMsg = 'No tasks due today';
@@ -1454,6 +1534,10 @@ function updateSidebarCounts() {
   // Overdue count
   const overdueTasks = activeTasks.filter(t => t.due_date && t.due_date < todayStr);
   if (sidebarOverdueCount) sidebarOverdueCount.textContent = overdueTasks.length;
+
+  // Completed count
+  const completedTasks = tasks.filter(t => t.status === 'Completed');
+  if (sidebarCompletedCount) sidebarCompletedCount.textContent = completedTasks.length;
 }
 
 // ==================== NAVIGATION & VIEW HANDLING ====================
@@ -1489,9 +1573,10 @@ function handleCategoryPillClick(pill) {
 function updatePageHeader() {
   const titles = {
     inbox:    { emoji: '📥', title: 'Inbox',    subtitle: 'All your tasks securely stored in PostgreSQL' },
-    today:    { emoji: '📅', title: 'Today',    subtitle: 'Focus on what matters today'  },
-    upcoming: { emoji: '⏳', title: 'Upcoming', subtitle: 'Plan ahead for the next 7 days' },
-    overdue:  { emoji: '⚠️', title: 'Overdue',  subtitle: 'Tasks that require immediate attention' }
+    today:     { emoji: '📅', title: 'Today',     subtitle: 'Focus on what matters today'  },
+    upcoming:  { emoji: '⏳', title: 'Upcoming',  subtitle: 'Plan ahead for the next 7 days' },
+    overdue:   { emoji: '⚠️', title: 'Overdue',   subtitle: 'Tasks that require immediate attention' },
+    completed: { emoji: '✅', title: 'Completed', subtitle: 'Celebrate your finished tasks' }
   };
 
   const current = titles[currentView] || titles.inbox;

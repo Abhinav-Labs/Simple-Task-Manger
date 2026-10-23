@@ -116,6 +116,7 @@ Use Supabase Auth for user accounts and one main application table called `tasks
 | title | Text | Task name |
 | description | Text | Optional details |
 | priority | Text | Low, Medium, or High |
+| category | Text | General, Work, Personal, Study, Finance, Health |
 | status | Text | Pending or Completed |
 | due_date | Date | Optional deadline |
 | created_at | Timestamp | Creation time |
@@ -126,6 +127,7 @@ Recommended constraints:
 - `user_id` references `auth.users(id)` with cascading deletion.
 - `title` is required and cannot be empty.
 - `priority` accepts only Low, Medium, or High.
+- `category` defaults to General.
 - `status` accepts only Pending or Completed.
 - `created_at` defaults to the current timestamp.
 - `due_date` can be null.
@@ -149,6 +151,8 @@ create table public.tasks (
   priority text not null default 'Medium'
     check (priority in ('Low', 'Medium', 'High')),
 
+  category text not null default 'General',
+
   status text not null default 'Pending'
     check (status in ('Pending', 'Completed')),
 
@@ -157,8 +161,11 @@ create table public.tasks (
   created_at timestamptz not null default now()
 );
 
-create index tasks_user_id_idx
-on public.tasks(user_id);
+-- For databases that already created the table without category:
+alter table public.tasks add column if not exists category text not null default 'General';
+
+create index tasks_user_id_idx on public.tasks(user_id);
+create index tasks_category_idx on public.tasks(category);
 
 alter table public.tasks enable row level security;
 ```

@@ -608,6 +608,11 @@ body {
   color: var(--color-danger);
 }
 
+.nav-count.count-success {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
 .nav-item.active .nav-count {
   color: var(--text-secondary);
 }
