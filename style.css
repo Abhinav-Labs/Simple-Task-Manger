@@ -992,29 +992,6 @@ body {
   border-color: var(--accent);
 }
 
-/* Clickable Date Picker on Entire Box */
-.clickable-date-input, .option-date, input[type="date"] {
-  cursor: pointer !important;
-}
-
-.clickable-date-input::-webkit-calendar-picker-indicator,
-.option-date::-webkit-calendar-picker-indicator,
-input[type="date"]::-webkit-calendar-picker-indicator {
-  cursor: pointer !important;
-  opacity: 0.75;
-  transition: opacity var(--transition), transform var(--transition);
-}
-
-.clickable-date-input:hover::-webkit-calendar-picker-indicator,
-.option-date:hover::-webkit-calendar-picker-indicator,
-input[type="date"]:hover::-webkit-calendar-picker-indicator {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-.date-field-wrapper {
-  cursor: pointer;
-}
 
 .option-textarea {
   resize: vertical;

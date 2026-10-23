@@ -535,9 +535,6 @@ function setupEventListeners() {
     toggleMainEmailBtn.addEventListener('click', toggleMainEmailVisibility);
   }
 
-  // Setup full-box click handlers for date inputs
-  setupDatePickerTriggers();
-
   // Escape key closes open modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
@@ -574,39 +571,6 @@ function setupPasswordToggles() {
       if (eyeClosed) eyeClosed.style.display = isPassword ? 'block' : 'none';
       input.focus();
     });
-  });
-}
-
-function setupDatePickerTriggers() {
-  const dateInputs = document.querySelectorAll('input[type="date"]');
-  dateInputs.forEach(input => {
-    // When clicking anywhere on the input element
-    input.addEventListener('click', () => {
-      if (typeof input.showPicker === 'function') {
-        try {
-          input.showPicker();
-        } catch (err) {
-          // Handled if already active
-        }
-      }
-    });
-
-    // Also support clicking anywhere in the container/label
-    const wrapper = input.closest('.date-field-wrapper');
-    if (wrapper) {
-      wrapper.addEventListener('click', (e) => {
-        if (e.target !== input) {
-          input.focus();
-          if (typeof input.showPicker === 'function') {
-            try {
-              input.showPicker();
-            } catch (err) {
-              // Handled
-            }
-          }
-        }
-      });
-    }
   });
 }
 
