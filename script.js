@@ -27,8 +27,12 @@ let statTotal, statCompleted, statPending, statOverdue, progressPercentage, prog
 let inboxCount, todayCount, upcomingCount, sidebarOverdueCount;
 let pageTitle, pageSubtitle, pageEmoji;
 let menuBtn, sidebar, overlay;
+let collapseSidebarBtn, expandSidebarBtn, sidebarEdgeZone;
 let editModal, editTaskForm, editTaskId, editTaskTitle, editTaskDescription, editTaskPriority, editTaskCategory, editTaskDueDate, closeEditModalBtn, cancelEditBtn;
 let toastContainer;
+
+// Logout Confirmation Modal DOM Elements
+let logoutModal, cancelLogoutBtn, confirmLogoutBtn;
 
 // Theme & Settings DOM Elements
 let themeToggleBtn, themeToggleLabel, mobileThemeBtn, themeOptionLight, themeOptionDark;
@@ -43,6 +47,7 @@ document.addEventListener('DOMContentLoaded', initApp);
 async function initApp() {
   cacheDOMElements();
   initTheme();
+  initSidebarState();
   setupEventListeners();
 
   // Initialize Supabase Client
@@ -201,6 +206,13 @@ function cacheDOMElements() {
   menuBtn = document.getElementById('menuBtn');
   sidebar = document.getElementById('sidebar');
   overlay = document.getElementById('overlay');
+  collapseSidebarBtn = document.getElementById('collapseSidebarBtn');
+  expandSidebarBtn = document.getElementById('expandSidebarBtn');
+  sidebarEdgeZone = document.getElementById('sidebarEdgeZone');
+
+  logoutModal = document.getElementById('logoutModal');
+  cancelLogoutBtn = document.getElementById('cancelLogoutBtn');
+  confirmLogoutBtn = document.getElementById('confirmLogoutBtn');
 
   editModal = document.getElementById('editModal');
   editTaskForm = document.getElementById('editTaskForm');
@@ -387,9 +399,21 @@ function setupEventListeners() {
     authForm.addEventListener('submit', handleAuthSubmit);
   }
 
-  // Logout buttons
-  if (logoutBtn) logoutBtn.addEventListener('click', handleSignOut);
-  if (mobileLogoutBtn) mobileLogoutBtn.addEventListener('click', handleSignOut);
+  // Logout confirmation modal triggers
+  if (logoutBtn) logoutBtn.addEventListener('click', openLogoutModal);
+  if (mobileLogoutBtn) mobileLogoutBtn.addEventListener('click', openLogoutModal);
+  if (cancelLogoutBtn) cancelLogoutBtn.addEventListener('click', closeLogoutModal);
+  if (confirmLogoutBtn) {
+    confirmLogoutBtn.addEventListener('click', async () => {
+      closeLogoutModal();
+      await handleSignOut();
+    });
+  }
+  if (logoutModal) {
+    logoutModal.addEventListener('click', (e) => {
+      if (e.target === logoutModal) closeLogoutModal();
+    });
+  }
 
   // Theme Toggles
   if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
@@ -491,9 +515,23 @@ function setupEventListeners() {
     });
   }
 
-  // Mobile menu
-  if (menuBtn) menuBtn.addEventListener('click', toggleSidebar);
+  // Sidebar toggle / collapse / expand triggers
+  if (collapseSidebarBtn) collapseSidebarBtn.addEventListener('click', collapseSidebar);
+  if (expandSidebarBtn) expandSidebarBtn.addEventListener('click', expandSidebar);
+  if (menuBtn) menuBtn.addEventListener('click', toggleSidebarResponsive);
   if (overlay) overlay.addEventListener('click', closeSidebar);
+
+  // Setup sidebar mouse & touch drag handlers
+  setupSidebarDrag();
+
+  // Escape key closes open modals
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (logoutModal && logoutModal.style.display === 'flex') closeLogoutModal();
+      if (settingsModal && settingsModal.style.display === 'flex') closeSettingsModal();
+      if (editModal && editModal.style.display === 'flex') closeEditModal();
+    }
+  });
 }
 
 // ==================== AUTHENTICATION FLOWS ====================
@@ -895,6 +933,20 @@ async function handleAddTask() {
     return;
   }
 
+  // Duplicate task check (case-insensitive)
+  const isDuplicate = tasks.some(t => t.title && t.title.trim().toLowerCase() === title.toLowerCase());
+  if (isDuplicate) {
+    showToast(`A task named "${title}" already exists!`, 'warning');
+    taskInput.classList.remove('input-shake');
+    void taskInput.offsetWidth; // trigger reflow for smooth animation
+    taskInput.classList.add('input-shake');
+    taskInput.focus();
+    setTimeout(() => {
+      if (taskInput) taskInput.classList.remove('input-shake');
+    }, 600);
+    return;
+  }
+
   if (!currentUser || !supabaseClient) {
     showToast('Please sign in to add tasks.', 'error');
     return;
@@ -1010,6 +1062,7 @@ async function deleteTask(id) {
   const taskEl = document.querySelector(`[data-id="${id}"]`);
   if (taskEl) {
     taskEl.classList.add('removing');
+    await new Promise(r => setTimeout(r, 220));
   }
 
   try {
@@ -1068,11 +1121,25 @@ async function handleSaveEditedTask(e) {
   const dueDate = editTaskDueDate.value || null;
 
   if (!title) {
-    alert('Task title cannot be empty.');
+    showToast('Task title cannot be empty.', 'warning');
     return;
   }
 
   const saveBtn = document.getElementById('saveEditBtn');
+
+  // Check for duplicate title on another task (case-insensitive)
+  const isDuplicate = tasks.some(t => t.id !== id && t.title && t.title.trim().toLowerCase() === title.toLowerCase());
+  if (isDuplicate) {
+    showToast(`Another task named "${title}" already exists!`, 'warning');
+    editTaskTitle.classList.remove('input-shake');
+    void editTaskTitle.offsetWidth; // trigger reflow
+    editTaskTitle.classList.add('input-shake');
+    editTaskTitle.focus();
+    setTimeout(() => {
+      if (editTaskTitle) editTaskTitle.classList.remove('input-shake');
+    }, 600);
+    return;
+  }
   if (saveBtn) saveBtn.disabled = true;
 
   try {
@@ -1408,6 +1475,47 @@ function updatePageHeader() {
   if (pageSubtitle) pageSubtitle.textContent = current.subtitle;
 }
 
+// ==================== SIDEBAR COLLAPSE, EXPAND & DRAG ====================
+function initSidebarState() {
+  try {
+    const isSidebarCollapsed = localStorage.getItem('sidebar_collapsed') === 'true';
+    if (isSidebarCollapsed && window.innerWidth > 768 && mainApp) {
+      mainApp.classList.add('sidebar-collapsed');
+    }
+  } catch (e) {}
+}
+
+function collapseSidebar() {
+  if (window.innerWidth > 768) {
+    if (mainApp) mainApp.classList.add('sidebar-collapsed');
+    try { localStorage.setItem('sidebar_collapsed', 'true'); } catch (e) {}
+  } else {
+    closeSidebar();
+  }
+}
+
+function expandSidebar() {
+  if (window.innerWidth > 768) {
+    if (mainApp) mainApp.classList.remove('sidebar-collapsed');
+    try { localStorage.setItem('sidebar_collapsed', 'false'); } catch (e) {}
+  } else {
+    if (sidebar) sidebar.classList.add('open');
+    if (overlay) overlay.classList.add('active');
+  }
+}
+
+function toggleSidebarResponsive() {
+  if (window.innerWidth > 768) {
+    if (mainApp && mainApp.classList.contains('sidebar-collapsed')) {
+      expandSidebar();
+    } else {
+      collapseSidebar();
+    }
+  } else {
+    toggleSidebar();
+  }
+}
+
 function toggleSidebar() {
   if (sidebar) sidebar.classList.toggle('open');
   if (overlay) overlay.classList.toggle('active');
@@ -1416,6 +1524,110 @@ function toggleSidebar() {
 function closeSidebar() {
   if (sidebar) sidebar.classList.remove('open');
   if (overlay) overlay.classList.remove('active');
+}
+
+function setupSidebarDrag() {
+  // Drag to close: when user drags left on sidebar
+  let sidebarStartX = 0;
+  let sidebarStartY = 0;
+  let isSidebarDragging = false;
+
+  function onSidebarStart(e) {
+    if (e.target.closest('button, input, select, textarea, a, .nav-item, .cat-pill')) {
+      return;
+    }
+    const pt = e.touches ? e.touches[0] : e;
+    sidebarStartX = pt.clientX;
+    sidebarStartY = pt.clientY;
+    isSidebarDragging = true;
+  }
+
+  function onSidebarMove(e) {
+    if (!isSidebarDragging) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const diffX = pt.clientX - sidebarStartX;
+    const diffY = pt.clientY - sidebarStartY;
+
+    // Detect intentional horizontal drag left (at least 35px)
+    if (diffX < -35 && Math.abs(diffX) > Math.abs(diffY)) {
+      isSidebarDragging = false;
+      collapseSidebar();
+    }
+  }
+
+  function onSidebarEnd() {
+    isSidebarDragging = false;
+  }
+
+  if (sidebar) {
+    sidebar.addEventListener('mousedown', onSidebarStart);
+    window.addEventListener('mousemove', onSidebarMove);
+    window.addEventListener('mouseup', onSidebarEnd);
+
+    sidebar.addEventListener('touchstart', onSidebarStart, { passive: true });
+    window.addEventListener('touchmove', onSidebarMove, { passive: true });
+    window.addEventListener('touchend', onSidebarEnd);
+  }
+
+  // Drag to open: when user drags right from left edge zone or screen left edge <= 28px
+  let edgeStartX = 0;
+  let edgeStartY = 0;
+  let isEdgeDragging = false;
+
+  function onEdgeStart(e) {
+    const pt = e.touches ? e.touches[0] : e;
+    const isCollapsed = (window.innerWidth > 768 && mainApp && mainApp.classList.contains('sidebar-collapsed')) ||
+                        (window.innerWidth <= 768 && sidebar && !sidebar.classList.contains('open'));
+
+    if (isCollapsed && pt.clientX <= 28) {
+      edgeStartX = pt.clientX;
+      edgeStartY = pt.clientY;
+      isEdgeDragging = true;
+    }
+  }
+
+  function onEdgeMove(e) {
+    if (!isEdgeDragging) return;
+    const pt = e.touches ? e.touches[0] : e;
+    const diffX = pt.clientX - edgeStartX;
+    const diffY = pt.clientY - edgeStartY;
+
+    // Detect intentional horizontal drag right (at least 28px)
+    if (diffX > 28 && Math.abs(diffX) > Math.abs(diffY)) {
+      isEdgeDragging = false;
+      expandSidebar();
+    }
+  }
+
+  function onEdgeEnd() {
+    isEdgeDragging = false;
+  }
+
+  if (sidebarEdgeZone) {
+    sidebarEdgeZone.addEventListener('mousedown', onEdgeStart);
+    sidebarEdgeZone.addEventListener('touchstart', onEdgeStart, { passive: true });
+  }
+
+  window.addEventListener('mousedown', onEdgeStart);
+  window.addEventListener('mousemove', onEdgeMove);
+  window.addEventListener('mouseup', onEdgeEnd);
+
+  window.addEventListener('touchstart', onEdgeStart, { passive: true });
+  window.addEventListener('touchmove', onEdgeMove, { passive: true });
+  window.addEventListener('touchend', onEdgeEnd);
+}
+
+// ==================== LOGOUT CONFIRMATION MODAL ====================
+function openLogoutModal() {
+  if (logoutModal) {
+    logoutModal.style.display = 'flex';
+  }
+}
+
+function closeLogoutModal() {
+  if (logoutModal) {
+    logoutModal.style.display = 'none';
+  }
 }
 
 function showLoading(show) {
