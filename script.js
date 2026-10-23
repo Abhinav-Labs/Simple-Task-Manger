@@ -50,6 +50,7 @@ async function initApp() {
   initTheme();
   initSidebarState();
   setupEventListeners();
+  updateAllCustomSelects();
 
   // Initialize Supabase Client
   const initialized = initSupabase();
@@ -535,13 +536,109 @@ function setupEventListeners() {
     toggleMainEmailBtn.addEventListener('click', toggleMainEmailVisibility);
   }
 
-  // Escape key closes open modals
+  // Setup custom select dropdowns
+  initCustomSelects();
+
+  // Escape key closes open modals and dropdowns
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      closeAllCustomSelects();
       if (logoutModal && logoutModal.style.display === 'flex') closeLogoutModal();
       if (settingsModal && settingsModal.style.display === 'flex') closeSettingsModal();
       if (editModal && editModal.style.display === 'flex') closeEditModal();
     }
+  });
+}
+
+// ==================== CUSTOM SELECT DROPDOWNS ====================
+function initCustomSelects() {
+  document.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+    const trigger = wrapper.querySelector('.custom-select-trigger');
+    const dropdown = wrapper.querySelector('.custom-select-dropdown');
+    const select = wrapper.querySelector('select');
+    if (!trigger || !dropdown || !select) return;
+
+    // Trigger click toggles dropdown
+    trigger.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const isAlreadyOpen = wrapper.classList.contains('open');
+      closeAllCustomSelects();
+      if (!isAlreadyOpen) {
+        wrapper.classList.add('open');
+        dropdown.classList.add('open');
+        trigger.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    // Option click updates select and closes dropdown
+    dropdown.querySelectorAll('.custom-select-option').forEach(option => {
+      option.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const value = option.getAttribute('data-value');
+        if (value) {
+          select.value = value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          updateCustomSelectWrapper(wrapper);
+        }
+        closeAllCustomSelects();
+      });
+    });
+
+    // Sync on native change event
+    select.addEventListener('change', () => {
+      updateCustomSelectWrapper(wrapper);
+    });
+  });
+
+  // Clicking anywhere outside closes all open custom select dropdowns
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.custom-select-wrapper')) {
+      closeAllCustomSelects();
+    }
+  });
+}
+
+function closeAllCustomSelects() {
+  document.querySelectorAll('.custom-select-wrapper.open').forEach(wrapper => {
+    wrapper.classList.remove('open');
+    const dropdown = wrapper.querySelector('.custom-select-dropdown');
+    const trigger = wrapper.querySelector('.custom-select-trigger');
+    if (dropdown) dropdown.classList.remove('open');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function updateCustomSelectWrapper(wrapper) {
+  const select = wrapper.querySelector('select');
+  const trigger = wrapper.querySelector('.custom-select-trigger');
+  const dropdown = wrapper.querySelector('.custom-select-dropdown');
+  if (!select || !trigger || !dropdown) return;
+
+  const val = select.value;
+  const valueDisplay = trigger.querySelector('.custom-select-value');
+
+  if (valueDisplay) {
+    if (select.id.toLowerCase().includes('priority')) {
+      const dotType = val.toLowerCase();
+      valueDisplay.innerHTML = `<span class="priority-dot priority-dot-${dotType}"></span><span>${val}</span>`;
+    } else if (select.id.toLowerCase().includes('category')) {
+      const catClass = `cat-${val.toLowerCase()}`;
+      valueDisplay.innerHTML = `<span class="category-tag-mini ${catClass}">${val}</span>`;
+    } else {
+      valueDisplay.textContent = val;
+    }
+  }
+
+  dropdown.querySelectorAll('.custom-select-option').forEach(opt => {
+    opt.classList.toggle('selected', opt.getAttribute('data-value') === val);
+  });
+}
+
+function updateAllCustomSelects() {
+  document.querySelectorAll('.custom-select-wrapper').forEach(wrapper => {
+    updateCustomSelectWrapper(wrapper);
   });
 }
 
@@ -1165,6 +1262,7 @@ async function handleAddTask() {
     if (taskDescription) taskDescription.value = '';
     if (taskPriority) taskPriority.value = 'Medium';
     if (taskCategory) taskCategory.value = 'General';
+    updateAllCustomSelects();
     if (taskDueDate) taskDueDate.value = getTodayDateString();
     if (taskOptionsPanel) taskOptionsPanel.style.display = 'none';
     if (toggleDetailsBtn) toggleDetailsBtn.classList.remove('active');
@@ -1262,6 +1360,7 @@ function openEditModal(id) {
   editTaskDescription.value = task.description || '';
   editTaskPriority.value = task.priority || 'Medium';
   if (editTaskCategory) editTaskCategory.value = task.category || 'General';
+  updateAllCustomSelects();
   editTaskDueDate.value = task.due_date || '';
 
   editModal.style.display = 'flex';

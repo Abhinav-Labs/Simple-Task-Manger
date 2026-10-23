@@ -366,24 +366,79 @@
           <div class="task-options-panel" id="taskOptionsPanel" style="display: none;">
             <div class="options-row">
               <div class="option-field">
-                <label for="taskPriority">Priority</label>
-                <select id="taskPriority" class="option-select">
-                  <option value="Low">Low</option>
-                  <option value="Medium" selected>Medium</option>
-                  <option value="High">High</option>
-                </select>
+                <label for="taskPriorityTrigger">Priority</label>
+                <div class="custom-select-wrapper" id="taskPriorityWrapper">
+                  <select id="taskPriority" class="visually-hidden" tabindex="-1">
+                    <option value="Low">Low</option>
+                    <option value="Medium" selected>Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                  <button type="button" class="custom-select-trigger" id="taskPriorityTrigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="custom-select-value">
+                      <span class="priority-dot priority-dot-medium"></span>
+                      <span>Medium</span>
+                    </span>
+                    <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                  </button>
+                  <div class="custom-select-dropdown" id="taskPriorityDropdown" role="listbox">
+                    <div class="custom-select-option" data-value="Low" role="option">
+                      <span class="priority-dot priority-dot-low"></span>
+                      <span>Low</span>
+                    </div>
+                    <div class="custom-select-option selected" data-value="Medium" role="option">
+                      <span class="priority-dot priority-dot-medium"></span>
+                      <span>Medium</span>
+                    </div>
+                    <div class="custom-select-option" data-value="High" role="option">
+                      <span class="priority-dot priority-dot-high"></span>
+                      <span>High</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="option-field">
-                <label for="taskCategory">Category</label>
-                <select id="taskCategory" class="option-select">
-                  <option value="General" selected>General</option>
-                  <option value="Work">Work</option>
-                  <option value="Personal">Personal</option>
-                  <option value="Study">Study</option>
-                  <option value="Finance">Finance</option>
-                  <option value="Health">Health</option>
-                </select>
+                <label for="taskCategoryTrigger">Category</label>
+                <div class="custom-select-wrapper" id="taskCategoryWrapper">
+                  <select id="taskCategory" class="visually-hidden" tabindex="-1">
+                    <option value="General" selected>General</option>
+                    <option value="Work">Work</option>
+                    <option value="Personal">Personal</option>
+                    <option value="Study">Study</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Health">Health</option>
+                  </select>
+                  <button type="button" class="custom-select-trigger" id="taskCategoryTrigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="custom-select-value">
+                      <span class="category-tag-mini cat-general">General</span>
+                    </span>
+                    <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M6 9l6 6 6-6"/>
+                    </svg>
+                  </button>
+                  <div class="custom-select-dropdown" id="taskCategoryDropdown" role="listbox">
+                    <div class="custom-select-option selected" data-value="General" role="option">
+                      <span class="category-tag-mini cat-general">General</span>
+                    </div>
+                    <div class="custom-select-option" data-value="Work" role="option">
+                      <span class="category-tag-mini cat-work">Work</span>
+                    </div>
+                    <div class="custom-select-option" data-value="Personal" role="option">
+                      <span class="category-tag-mini cat-personal">Personal</span>
+                    </div>
+                    <div class="custom-select-option" data-value="Study" role="option">
+                      <span class="category-tag-mini cat-study">Study</span>
+                    </div>
+                    <div class="custom-select-option" data-value="Finance" role="option">
+                      <span class="category-tag-mini cat-finance">Finance</span>
+                    </div>
+                    <div class="custom-select-option" data-value="Health" role="option">
+                      <span class="category-tag-mini cat-health">Health</span>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="option-field">
@@ -481,24 +536,79 @@
 
         <div class="form-row form-row-three">
           <div class="form-group">
-            <label for="editTaskPriority">Priority</label>
-            <select id="editTaskPriority" class="form-select">
-              <option value="Low">Low</option>
-              <option value="Medium">Medium</option>
-              <option value="High">High</option>
-            </select>
+            <label for="editTaskPriorityTrigger">Priority</label>
+            <div class="custom-select-wrapper" id="editTaskPriorityWrapper">
+              <select id="editTaskPriority" class="visually-hidden" tabindex="-1">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+              <button type="button" class="custom-select-trigger" id="editTaskPriorityTrigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="custom-select-value">
+                  <span class="priority-dot priority-dot-medium"></span>
+                  <span>Medium</span>
+                </span>
+                <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </button>
+              <div class="custom-select-dropdown" id="editTaskPriorityDropdown" role="listbox">
+                <div class="custom-select-option" data-value="Low" role="option">
+                  <span class="priority-dot priority-dot-low"></span>
+                  <span>Low</span>
+                </div>
+                <div class="custom-select-option selected" data-value="Medium" role="option">
+                  <span class="priority-dot priority-dot-medium"></span>
+                  <span>Medium</span>
+                </div>
+                <div class="custom-select-option" data-value="High" role="option">
+                  <span class="priority-dot priority-dot-high"></span>
+                  <span>High</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
-            <label for="editTaskCategory">Category</label>
-            <select id="editTaskCategory" class="form-select">
-              <option value="General">General</option>
-              <option value="Work">Work</option>
-              <option value="Personal">Personal</option>
-              <option value="Study">Study</option>
-              <option value="Finance">Finance</option>
-              <option value="Health">Health</option>
-            </select>
+            <label for="editTaskCategoryTrigger">Category</label>
+            <div class="custom-select-wrapper" id="editTaskCategoryWrapper">
+              <select id="editTaskCategory" class="visually-hidden" tabindex="-1">
+                <option value="General">General</option>
+                <option value="Work">Work</option>
+                <option value="Personal">Personal</option>
+                <option value="Study">Study</option>
+                <option value="Finance">Finance</option>
+                <option value="Health">Health</option>
+              </select>
+              <button type="button" class="custom-select-trigger" id="editTaskCategoryTrigger" aria-haspopup="listbox" aria-expanded="false">
+                <span class="custom-select-value">
+                  <span class="category-tag-mini cat-general">General</span>
+                </span>
+                <svg class="select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M6 9l6 6 6-6"/>
+                </svg>
+              </button>
+              <div class="custom-select-dropdown" id="editTaskCategoryDropdown" role="listbox">
+                <div class="custom-select-option" data-value="General" role="option">
+                  <span class="category-tag-mini cat-general">General</span>
+                </div>
+                <div class="custom-select-option" data-value="Work" role="option">
+                  <span class="category-tag-mini cat-work">Work</span>
+                </div>
+                <div class="custom-select-option" data-value="Personal" role="option">
+                  <span class="category-tag-mini cat-personal">Personal</span>
+                </div>
+                <div class="custom-select-option" data-value="Study" role="option">
+                  <span class="category-tag-mini cat-study">Study</span>
+                </div>
+                <div class="custom-select-option" data-value="Finance" role="option">
+                  <span class="category-tag-mini cat-finance">Finance</span>
+                </div>
+                <div class="custom-select-option" data-value="Health" role="option">
+                  <span class="category-tag-mini cat-health">Health</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
