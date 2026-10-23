@@ -39,8 +39,21 @@ async function initApp() {
   const initialized = initSupabase();
   if (!initialized) {
     showAuthScreen();
-    if (configWarning) configWarning.style.display = 'block';
+    if (configWarning) {
+      configWarning.style.display = 'block';
+      if (setupUrl && !setupUrl.value) {
+        setupUrl.value = localStorage.getItem('supabase_url') || '';
+      }
+      if (setupKey && !setupKey.value) {
+        setupKey.value = localStorage.getItem('supabase_anon_key') || '';
+      }
+    }
     return;
+  }
+
+  // Supabase is successfully initialized: ensure config warning is hidden
+  if (configWarning) {
+    configWarning.style.display = 'none';
   }
 
   // Check initial authentication session
@@ -155,6 +168,24 @@ function cacheDOMElements() {
   }
 }
 
+// ==================== SANITIZATION UTILITIES ====================
+function sanitizeUrl(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.trim()
+    .replace(/^['"`]+|['"`]+$/g, '') // remove surrounding quotes
+    .replace(/\/+$/, '')             // remove trailing slashes
+    .replace(/\/rest\/v1\/?$/i, '')   // remove /rest/v1
+    .trim();
+}
+
+function sanitizeKey(raw) {
+  if (!raw || typeof raw !== 'string') return '';
+  return raw.trim()
+    .replace(/^['"`]+|['"`]+$/g, '') // remove surrounding quotes
+    .replace(/_SUPABASE_ANON_KEY$/i, '')
+    .trim();
+}
+
 // ==================== SUPABASE INITIALIZATION ====================
 function initSupabase() {
   if (typeof window.supabase === 'undefined') {
@@ -168,19 +199,18 @@ function initSupabase() {
   const configUrl = window.SUPABASE_CONFIG?.url;
   const configKey = window.SUPABASE_CONFIG?.anonKey;
 
-  const url = storedUrl || (configUrl && !configUrl.includes('YOUR_SUPABASE_PROJECT_URL') ? configUrl : null);
-  const anonKey = storedKey || (configKey && !configKey.includes('YOUR_SUPABASE_ANON_KEY') ? configKey : null);
+  const rawUrl = storedUrl || (configUrl && !configUrl.includes('YOUR_SUPABASE_PROJECT_URL') ? configUrl : null);
+  const rawKey = storedKey || (configKey && !configKey.includes('YOUR_SUPABASE_ANON_KEY') ? configKey : null);
 
-  if (!url || !anonKey) {
+  const cleanUrl = sanitizeUrl(rawUrl);
+  const cleanKey = sanitizeKey(rawKey);
+
+  if (!cleanUrl || !cleanKey) {
     return false;
   }
 
-  // Clean trailing slashes and /rest/v1 if included
-  const cleanUrl = url.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '');
-  const cleanAnonKey = anonKey.trim().replace(/_SUPABASE_ANON_KEY$/, '');
-
   try {
-    supabaseClient = window.supabase.createClient(cleanUrl, cleanAnonKey, {
+    supabaseClient = window.supabase.createClient(cleanUrl, cleanKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
@@ -198,16 +228,71 @@ function initSupabase() {
 function setupEventListeners() {
   // Config save helper
   if (saveConfigBtn) {
-    saveConfigBtn.addEventListener('click', () => {
-      const url = setupUrl.value.trim();
-      const key = setupKey.value.trim();
-      if (!url || !key) {
-        alert('Please provide both your Supabase URL and public anon key.');
+    saveConfigBtn.addEventListener('click', async () => {
+      const cleanUrl = sanitizeUrl(setupUrl.value);
+      const cleanKey = sanitizeKey(setupKey.value);
+
+      if (!cleanUrl || !cleanKey) {
+        alert('Please enter both your Supabase URL and public anon key.');
         return;
       }
-      localStorage.setItem('supabase_url', url);
-      localStorage.setItem('supabase_anon_key', key);
-      window.location.reload();
+
+      if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
+        alert('The Project URL must start with https:// (e.g., https://your-project.supabase.co)');
+        return;
+      }
+
+      saveConfigBtn.disabled = true;
+      const originalText = saveConfigBtn.textContent;
+      saveConfigBtn.textContent = 'Verifying...';
+
+      try {
+        const client = window.supabase.createClient(cleanUrl, cleanKey, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: true
+          }
+        });
+
+        // Test connection
+        await client.auth.getSession();
+
+        // Successful! Store clean keys in localStorage
+        localStorage.setItem('supabase_url', cleanUrl);
+        localStorage.setItem('supabase_anon_key', cleanKey);
+        supabaseClient = client;
+
+        // Hide warning immediately without reload
+        if (configWarning) configWarning.style.display = 'none';
+        showToast('Connected to Supabase successfully!', 'success');
+
+        // Check if there is already an active session
+        const { data: { session } } = await client.auth.getSession();
+        if (session && session.user) {
+          onUserSignedIn(session.user);
+        } else {
+          showAuthScreen();
+        }
+
+        // Attach listener for auth events
+        client.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_IN' && session?.user) {
+            onUserSignedIn(session.user);
+          } else if (event === 'SIGNED_OUT') {
+            onUserSignedOut();
+          }
+        });
+
+      } catch (err) {
+        console.error('Configuration validation failed:', err);
+        alert('Failed to connect to Supabase:\n' + err.message + '\n\nPlease check your Project URL and anon key.');
+      } finally {
+        if (saveConfigBtn) {
+          saveConfigBtn.disabled = false;
+          saveConfigBtn.textContent = originalText;
+        }
+      }
     });
   }
 
@@ -438,6 +523,9 @@ function onUserSignedOut() {
 function showAuthScreen() {
   if (mainApp) mainApp.style.display = 'none';
   if (authScreen) authScreen.style.display = 'flex';
+  if (supabaseClient && configWarning) {
+    configWarning.style.display = 'none';
+  }
 }
 
 function showAuthAlert(msg, type = 'error') {

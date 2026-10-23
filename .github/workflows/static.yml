@@ -32,9 +32,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Generate config.js from secrets or fallback
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
-          if [ -n "${{ secrets.SUPABASE_URL }}" ] && [ -n "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
-            echo "window.SUPABASE_CONFIG = { url: '${{ secrets.SUPABASE_URL }}', anonKey: '${{ secrets.SUPABASE_ANON_KEY }}' };" > config.js
+          if [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ]; then
+            echo "window.SUPABASE_CONFIG = { url: '$SUPABASE_URL', anonKey: '$SUPABASE_ANON_KEY' };" > config.js
           elif [ ! -f config.js ]; then
             echo "window.SUPABASE_CONFIG = { url: '', anonKey: '' };" > config.js
           fi
