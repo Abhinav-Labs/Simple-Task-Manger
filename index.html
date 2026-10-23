@@ -7,6 +7,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Immediate Theme Application (Avoids Theme Flash) -->
+  <script>
+    (function() {
+      try {
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <link rel="stylesheet" href="style.css">
   <!-- Supabase JS Client v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -92,13 +106,37 @@
         </svg>
       </button>
       <span class="logo">Tasks</span>
-      <button class="icon-btn-mobile" id="mobileLogoutBtn" title="Logout">
-        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path>
-          <polyline points="16 17 21 12 16 7"></polyline>
-          <line x1="21" y1="12" x2="9" y2="12"></line>
-        </svg>
-      </button>
+      <div class="mobile-actions">
+        <button class="icon-btn-mobile" id="mobileThemeBtn" title="Toggle theme">
+          <svg class="sun-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display: none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+        </button>
+        <button class="icon-btn-mobile" id="mobileSettingsBtn" title="Settings">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <button class="icon-btn-mobile" id="mobileLogoutBtn" title="Logout">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path>
+            <polyline points="16 17 21 12 16 7"></polyline>
+            <line x1="21" y1="12" x2="9" y2="12"></line>
+          </svg>
+        </button>
+      </div>
     </div>
 
     <!-- Overlay -->
@@ -157,12 +195,42 @@
         </div>
       </nav>
 
-      <!-- Sidebar Footer with User Details & Logout -->
+      <!-- Sidebar Footer with User Details, Settings, Theme & Logout -->
       <div class="sidebar-footer">
         <div class="connection-status">
           <span class="status-indicator"></span>
           <span class="status-text">PostgreSQL RLS Active</span>
         </div>
+
+        <!-- Settings Button -->
+        <button class="sidebar-btn" id="openSettingsBtn" title="Account Settings">
+          <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          <span>Settings</span>
+        </button>
+
+        <!-- Dark/Light Theme Toggle Button -->
+        <button class="sidebar-btn" id="themeToggleBtn" title="Toggle Theme">
+          <svg class="sun-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+          <svg class="moon-icon" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="display: none;">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          </svg>
+          <span id="themeToggleLabel">Dark Mode</span>
+        </button>
+
+        <!-- Logout Button -->
         <button class="logout-btn" id="logoutBtn" title="Sign out of your session">
           <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"></path>
@@ -227,7 +295,7 @@
               placeholder="Add a new task (e.g. Finish final-year project report)..."
               aria-label="New task input"
             >
-            <button class="composer-toggle-btn" id="toggleDetailsBtn" type="button" title="Add priority & deadline">
+            <button class="composer-toggle-btn" id="toggleDetailsBtn" type="button" title="Add priority, category & deadline">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M12 5v14M5 12h14"></path>
               </svg>
@@ -241,7 +309,7 @@
             </button>
           </div>
 
-          <!-- Extended Task Options (Priority, Due Date, Description) -->
+          <!-- Extended Task Options (Priority, Category, Due Date, Description) -->
           <div class="task-options-panel" id="taskOptionsPanel" style="display: none;">
             <div class="options-row">
               <div class="option-field">
@@ -250,6 +318,18 @@
                   <option value="Low">Low</option>
                   <option value="Medium" selected>Medium</option>
                   <option value="High">High</option>
+                </select>
+              </div>
+
+              <div class="option-field">
+                <label for="taskCategory">Category</label>
+                <select id="taskCategory" class="option-select">
+                  <option value="General" selected>General</option>
+                  <option value="Work">Work</option>
+                  <option value="Personal">Personal</option>
+                  <option value="Study">Study</option>
+                  <option value="Finance">Finance</option>
+                  <option value="Health">Health</option>
                 </select>
               </div>
 
@@ -267,7 +347,7 @@
         </div>
       </section>
 
-      <!-- Controls: Filters, Search, and Sort -->
+      <!-- Controls: Status Filters, Category Filters, Search, and Sort -->
       <section class="task-controls">
         <!-- Status Filter Buttons -->
         <div class="filters">
@@ -275,6 +355,20 @@
           <button class="filter-btn" data-filter="pending">Pending</button>
           <button class="filter-btn" data-filter="completed">Completed</button>
           <button class="filter-btn" data-filter="overdue">Overdue</button>
+        </div>
+
+        <!-- Category Filter Pills Bar -->
+        <div class="category-filter-bar">
+          <span class="category-filter-label">Category:</span>
+          <div class="category-pills" id="categoryPills">
+            <button type="button" class="cat-pill active" data-category="all">All</button>
+            <button type="button" class="cat-pill" data-category="Work">Work</button>
+            <button type="button" class="cat-pill" data-category="Personal">Personal</button>
+            <button type="button" class="cat-pill" data-category="Study">Study</button>
+            <button type="button" class="cat-pill" data-category="Finance">Finance</button>
+            <button type="button" class="cat-pill" data-category="Health">Health</button>
+            <button type="button" class="cat-pill" data-category="General">General</button>
+          </div>
         </div>
 
         <!-- Search & Sort Row -->
@@ -332,13 +426,25 @@
           <textarea id="editTaskDescription" class="form-textarea" rows="3" placeholder="Additional details..."></textarea>
         </div>
 
-        <div class="form-row">
+        <div class="form-row form-row-three">
           <div class="form-group">
             <label for="editTaskPriority">Priority</label>
             <select id="editTaskPriority" class="form-select">
               <option value="Low">Low</option>
               <option value="Medium">Medium</option>
               <option value="High">High</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="editTaskCategory">Category</label>
+            <select id="editTaskCategory" class="form-select">
+              <option value="General">General</option>
+              <option value="Work">Work</option>
+              <option value="Personal">Personal</option>
+              <option value="Study">Study</option>
+              <option value="Finance">Finance</option>
+              <option value="Health">Health</option>
             </select>
           </div>
 
@@ -353,6 +459,106 @@
           <button type="submit" class="btn btn-primary" id="saveEditBtn">Save Changes</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ==================== ACCOUNT SETTINGS MODAL ==================== -->
+  <div class="modal-backdrop" id="settingsModal" style="display: none;">
+    <div class="modal-card settings-card">
+      <div class="modal-header">
+        <div class="settings-header-info">
+          <h2 class="modal-title">Account Settings</h2>
+          <p class="settings-subtitle">Manage your profile, login credentials, and appearance</p>
+        </div>
+        <button class="modal-close-btn" id="closeSettingsModalBtn" aria-label="Close settings">×</button>
+      </div>
+
+      <div class="settings-body">
+        <!-- 1. Edit User Name -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">👤</span>
+            <div>
+              <div class="settings-section-title">User Name</div>
+              <div class="settings-section-desc">Change the display name shown on your workspace</div>
+            </div>
+          </div>
+          <form id="settingsNameForm" class="settings-inline-form">
+            <input type="text" id="settingsNameInput" class="form-input" placeholder="Your Full Name" required>
+            <button type="submit" class="btn btn-primary" id="saveNameBtn">
+              <span class="btn-text">Save Name</span>
+              <span class="btn-spinner" style="display: none;"></span>
+            </button>
+          </form>
+        </div>
+
+        <!-- 2. Edit Email ID -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">✉️</span>
+            <div>
+              <div class="settings-section-title">Email ID</div>
+              <div class="settings-section-desc">Update your login email address</div>
+            </div>
+          </div>
+          <form id="settingsEmailForm" class="settings-inline-form">
+            <input type="email" id="settingsEmailInput" class="form-input" placeholder="new-email@example.com" required>
+            <button type="submit" class="btn btn-primary" id="saveEmailBtn">
+              <span class="btn-text">Update Email</span>
+              <span class="btn-spinner" style="display: none;"></span>
+            </button>
+          </form>
+          <small class="field-hint">A confirmation email will be sent by Supabase to verify the new email.</small>
+        </div>
+
+        <!-- 3. Edit Login Password -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">🔒</span>
+            <div>
+              <div class="settings-section-title">Login Password</div>
+              <div class="settings-section-desc">Set a new login password (minimum 6 characters)</div>
+            </div>
+          </div>
+          <form id="settingsPasswordForm" class="settings-stacked-form">
+            <div class="form-row">
+              <div class="form-group">
+                <label for="settingsPasswordInput">New Password</label>
+                <input type="password" id="settingsPasswordInput" class="form-input" placeholder="••••••••" minlength="6" required>
+              </div>
+              <div class="form-group">
+                <label for="settingsConfirmPasswordInput">Confirm Password</label>
+                <input type="password" id="settingsConfirmPasswordInput" class="form-input" placeholder="••••••••" minlength="6" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" id="savePasswordBtn">
+              <span class="btn-text">Update Password</span>
+              <span class="btn-spinner" style="display: none;"></span>
+            </button>
+          </form>
+        </div>
+
+        <!-- 4. Theme Preference -->
+        <div class="settings-section">
+          <div class="settings-section-header">
+            <span class="settings-section-icon">🌓</span>
+            <div>
+              <div class="settings-section-title">Theme Preference</div>
+              <div class="settings-section-desc">Choose your preferred workspace aesthetic</div>
+            </div>
+          </div>
+          <div class="theme-options-grid">
+            <button type="button" class="theme-option-card" id="themeOptionLight" data-theme-choice="light">
+              <span class="theme-preview-icon">☀️</span>
+              <span class="theme-preview-name">Light Mode</span>
+            </button>
+            <button type="button" class="theme-option-card" id="themeOptionDark" data-theme-choice="dark">
+              <span class="theme-preview-icon">🌙</span>
+              <span class="theme-preview-name">Dark Mode</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 

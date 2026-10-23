@@ -1,6 +1,7 @@
 /**
  * Simple Task Manager — Full-Stack Application Logic
  * Integrates Supabase Auth & PostgreSQL with Row Level Security (RLS)
+ * Features: Dark Mode, Task Categories & Filters, Account Settings (Name, Email, Password)
  */
 
 // ==================== STATE MANAGEMENT ====================
@@ -9,6 +10,7 @@ let currentUser = null;
 let tasks = [];
 let currentView = 'inbox';
 let currentFilter = 'all';
+let currentCategoryFilter = 'all';
 let searchQuery = '';
 let currentSort = 'created_desc';
 let isAuthModeLogin = true;
@@ -19,20 +21,28 @@ let loginTab, signupTab, authToggleBtn, authToggleText, nameFieldGroup, password
 let emailInput, passwordInput, fullNameInput;
 let configWarning, setupUrl, setupKey, saveConfigBtn;
 let userAvatar, userEmailDisplay, workspaceName, logoutBtn, mobileLogoutBtn;
-let taskInput, taskPriority, taskDueDate, taskDescription, addBtn, toggleDetailsBtn, taskOptionsPanel;
-let taskList, loadingIndicator, searchInput, clearSearchBtn, sortSelect, filterBtns, navItems;
+let taskInput, taskPriority, taskCategory, taskDueDate, taskDescription, addBtn, toggleDetailsBtn, taskOptionsPanel;
+let taskList, loadingIndicator, searchInput, clearSearchBtn, sortSelect, filterBtns, categoryPills, navItems;
 let statTotal, statCompleted, statPending, statOverdue, progressPercentage, progressBarFill;
 let inboxCount, todayCount, upcomingCount, sidebarOverdueCount;
 let pageTitle, pageSubtitle, pageEmoji;
 let menuBtn, sidebar, overlay;
-let editModal, editTaskForm, editTaskId, editTaskTitle, editTaskDescription, editTaskPriority, editTaskDueDate, closeEditModalBtn, cancelEditBtn;
+let editModal, editTaskForm, editTaskId, editTaskTitle, editTaskDescription, editTaskPriority, editTaskCategory, editTaskDueDate, closeEditModalBtn, cancelEditBtn;
 let toastContainer;
+
+// Theme & Settings DOM Elements
+let themeToggleBtn, themeToggleLabel, mobileThemeBtn, themeOptionLight, themeOptionDark;
+let openSettingsBtn, mobileSettingsBtn, settingsModal, closeSettingsModalBtn;
+let settingsNameForm, settingsNameInput, saveNameBtn;
+let settingsEmailForm, settingsEmailInput, saveEmailBtn;
+let settingsPasswordForm, settingsPasswordInput, settingsConfirmPasswordInput, savePasswordBtn;
 
 // ==================== INITIALIZATION ====================
 document.addEventListener('DOMContentLoaded', initApp);
 
 async function initApp() {
   cacheDOMElements();
+  initTheme();
   setupEventListeners();
 
   // Initialize Supabase Client
@@ -77,6 +87,8 @@ async function initApp() {
         onUserSignedIn(session.user);
       } else if (event === 'SIGNED_OUT') {
         onUserSignedOut();
+      } else if (event === 'USER_UPDATED' && session?.user) {
+        onUserSignedIn(session.user);
       }
     });
 
@@ -84,6 +96,44 @@ async function initApp() {
     console.error('Error during auth check:', err);
     showAuthScreen();
   }
+}
+
+// ==================== THEME MANAGEMENT ====================
+function initTheme() {
+  try {
+    const savedTheme = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (prefersDark ? 'dark' : 'light');
+    applyTheme(initialTheme, false);
+  } catch (e) {
+    applyTheme('light', false);
+  }
+}
+
+function applyTheme(theme, save = true) {
+  if (theme === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    if (themeToggleLabel) themeToggleLabel.textContent = 'Light Mode';
+    if (themeOptionDark) themeOptionDark.classList.add('active');
+    if (themeOptionLight) themeOptionLight.classList.remove('active');
+  } else {
+    document.documentElement.setAttribute('data-theme', 'light');
+    if (themeToggleLabel) themeToggleLabel.textContent = 'Dark Mode';
+    if (themeOptionLight) themeOptionLight.classList.add('active');
+    if (themeOptionDark) themeOptionDark.classList.remove('active');
+  }
+  if (save) {
+    try {
+      localStorage.setItem('theme', theme);
+    } catch (e) {}
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const newTheme = current === 'dark' ? 'light' : 'dark';
+  applyTheme(newTheme, true);
+  showToast(newTheme === 'dark' ? 'Dark mode activated 🌙' : 'Light mode activated ☀️', 'info');
 }
 
 // ==================== DOM CACHING ====================
@@ -116,6 +166,7 @@ function cacheDOMElements() {
 
   taskInput = document.getElementById('taskInput');
   taskPriority = document.getElementById('taskPriority');
+  taskCategory = document.getElementById('taskCategory');
   taskDueDate = document.getElementById('taskDueDate');
   taskDescription = document.getElementById('taskDescription');
   addBtn = document.getElementById('addBtn');
@@ -128,6 +179,7 @@ function cacheDOMElements() {
   clearSearchBtn = document.getElementById('clearSearchBtn');
   sortSelect = document.getElementById('sortSelect');
   filterBtns = document.querySelectorAll('.filter-btn');
+  categoryPills = document.querySelectorAll('.cat-pill');
   navItems = document.querySelectorAll('.nav-item');
 
   statTotal = document.getElementById('statTotal');
@@ -156,9 +208,35 @@ function cacheDOMElements() {
   editTaskTitle = document.getElementById('editTaskTitle');
   editTaskDescription = document.getElementById('editTaskDescription');
   editTaskPriority = document.getElementById('editTaskPriority');
+  editTaskCategory = document.getElementById('editTaskCategory');
   editTaskDueDate = document.getElementById('editTaskDueDate');
   closeEditModalBtn = document.getElementById('closeEditModalBtn');
   cancelEditBtn = document.getElementById('cancelEditBtn');
+
+  // Theme & Settings
+  themeToggleBtn = document.getElementById('themeToggleBtn');
+  themeToggleLabel = document.getElementById('themeToggleLabel');
+  mobileThemeBtn = document.getElementById('mobileThemeBtn');
+  themeOptionLight = document.getElementById('themeOptionLight');
+  themeOptionDark = document.getElementById('themeOptionDark');
+
+  openSettingsBtn = document.getElementById('openSettingsBtn');
+  mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
+  settingsModal = document.getElementById('settingsModal');
+  closeSettingsModalBtn = document.getElementById('closeSettingsModalBtn');
+
+  settingsNameForm = document.getElementById('settingsNameForm');
+  settingsNameInput = document.getElementById('settingsNameInput');
+  saveNameBtn = document.getElementById('saveNameBtn');
+
+  settingsEmailForm = document.getElementById('settingsEmailForm');
+  settingsEmailInput = document.getElementById('settingsEmailInput');
+  saveEmailBtn = document.getElementById('saveEmailBtn');
+
+  settingsPasswordForm = document.getElementById('settingsPasswordForm');
+  settingsPasswordInput = document.getElementById('settingsPasswordInput');
+  settingsConfirmPasswordInput = document.getElementById('settingsConfirmPasswordInput');
+  savePasswordBtn = document.getElementById('savePasswordBtn');
 
   toastContainer = document.getElementById('toastContainer');
 
@@ -312,6 +390,27 @@ function setupEventListeners() {
   if (logoutBtn) logoutBtn.addEventListener('click', handleSignOut);
   if (mobileLogoutBtn) mobileLogoutBtn.addEventListener('click', handleSignOut);
 
+  // Theme Toggles
+  if (themeToggleBtn) themeToggleBtn.addEventListener('click', toggleTheme);
+  if (mobileThemeBtn) mobileThemeBtn.addEventListener('click', toggleTheme);
+  if (themeOptionLight) themeOptionLight.addEventListener('click', () => applyTheme('light', true));
+  if (themeOptionDark) themeOptionDark.addEventListener('click', () => applyTheme('dark', true));
+
+  // Settings Modal Open/Close
+  if (openSettingsBtn) openSettingsBtn.addEventListener('click', openSettingsModal);
+  if (mobileSettingsBtn) mobileSettingsBtn.addEventListener('click', openSettingsModal);
+  if (closeSettingsModalBtn) closeSettingsModalBtn.addEventListener('click', closeSettingsModal);
+  if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+      if (e.target === settingsModal) closeSettingsModal();
+    });
+  }
+
+  // Settings Forms
+  if (settingsNameForm) settingsNameForm.addEventListener('submit', handleSaveName);
+  if (settingsEmailForm) settingsEmailForm.addEventListener('submit', handleSaveEmail);
+  if (settingsPasswordForm) settingsPasswordForm.addEventListener('submit', handleSavePassword);
+
   // Task Options toggle
   if (toggleDetailsBtn) {
     toggleDetailsBtn.addEventListener('click', () => {
@@ -343,9 +442,14 @@ function setupEventListeners() {
     });
   });
 
-  // Filter Buttons
+  // Status Filter Buttons
   filterBtns.forEach(btn => {
     btn.addEventListener('click', () => handleFilterClick(btn));
+  });
+
+  // Category Filter Pills
+  categoryPills.forEach(pill => {
+    pill.addEventListener('click', () => handleCategoryPillClick(pill));
   });
 
   // Search input
@@ -499,11 +603,7 @@ function onUserSignedIn(user) {
   authScreen.style.display = 'none';
   mainApp.style.display = 'flex';
 
-  // Display user information
-  const displayName = user.user_metadata?.full_name || user.email.split('@')[0];
-  if (userAvatar) userAvatar.textContent = displayName.charAt(0).toUpperCase();
-  if (userEmailDisplay) userEmailDisplay.textContent = user.email;
-  if (workspaceName) workspaceName.textContent = `${displayName}'s Workspace`;
+  updateUserDisplayInfo(user);
 
   // Fetch tasks for the authenticated user from PostgreSQL
   fetchTasks();
@@ -554,6 +654,170 @@ function setAuthLoading(loading) {
   }
 }
 
+function updateUserDisplayInfo(user) {
+  if (!user) return;
+  const displayName = user.user_metadata?.full_name || user.email.split('@')[0];
+  if (userAvatar) userAvatar.textContent = displayName.charAt(0).toUpperCase();
+  if (userEmailDisplay) userEmailDisplay.textContent = user.email;
+  if (workspaceName) workspaceName.textContent = `${displayName}'s Workspace`;
+}
+
+// ==================== ACCOUNT SETTINGS ====================
+function openSettingsModal() {
+  if (!settingsModal) return;
+  if (currentUser) {
+    if (settingsNameInput) {
+      settingsNameInput.value = currentUser.user_metadata?.full_name || '';
+    }
+    if (settingsEmailInput) {
+      settingsEmailInput.value = currentUser.email || '';
+    }
+  }
+  if (settingsPasswordInput) settingsPasswordInput.value = '';
+  if (settingsConfirmPasswordInput) settingsConfirmPasswordInput.value = '';
+
+  const activeTheme = document.documentElement.getAttribute('data-theme') || 'light';
+  applyTheme(activeTheme, false);
+
+  settingsModal.style.display = 'flex';
+  if (settingsNameInput) settingsNameInput.focus();
+}
+
+function closeSettingsModal() {
+  if (settingsModal) settingsModal.style.display = 'none';
+}
+
+function setBtnLoading(btn, loading, defaultText, loadingText) {
+  if (!btn) return;
+  btn.disabled = loading;
+  const btnText = btn.querySelector('.btn-text');
+  const btnSpinner = btn.querySelector('.btn-spinner');
+  if (loading) {
+    if (btnText) btnText.textContent = loadingText || 'Saving...';
+    if (btnSpinner) btnSpinner.style.display = 'inline-block';
+  } else {
+    if (btnText) btnText.textContent = defaultText;
+    if (btnSpinner) btnSpinner.style.display = 'none';
+  }
+}
+
+async function handleSaveName(e) {
+  e.preventDefault();
+  if (!supabaseClient || !currentUser) return;
+
+  const newName = settingsNameInput.value.trim();
+  if (!newName) {
+    showToast('Name cannot be empty.', 'error');
+    return;
+  }
+
+  setBtnLoading(saveNameBtn, true, 'Save Name', 'Saving...');
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      data: { full_name: newName }
+    });
+
+    if (error) {
+      console.error('Error updating name:', error);
+      showToast('Failed to update name: ' + error.message, 'error');
+      return;
+    }
+
+    if (data?.user) {
+      currentUser = data.user;
+      updateUserDisplayInfo(currentUser);
+    }
+    showToast('User name updated successfully!', 'success');
+  } catch (err) {
+    console.error('Unexpected error updating name:', err);
+    showToast('Network error while updating name.', 'error');
+  } finally {
+    setBtnLoading(saveNameBtn, false, 'Save Name');
+  }
+}
+
+async function handleSaveEmail(e) {
+  e.preventDefault();
+  if (!supabaseClient || !currentUser) return;
+
+  const newEmail = settingsEmailInput.value.trim();
+  if (!newEmail) {
+    showToast('Email cannot be empty.', 'error');
+    return;
+  }
+  if (newEmail.toLowerCase() === currentUser.email?.toLowerCase()) {
+    showToast('This is already your current email address.', 'info');
+    return;
+  }
+
+  setBtnLoading(saveEmailBtn, true, 'Update Email', 'Updating...');
+
+  try {
+    const { data, error } = await supabaseClient.auth.updateUser({
+      email: newEmail
+    });
+
+    if (error) {
+      console.error('Error updating email:', error);
+      showToast('Failed to update email: ' + error.message, 'error');
+      return;
+    }
+
+    if (data?.user) {
+      currentUser = data.user;
+      updateUserDisplayInfo(currentUser);
+    }
+    showToast('Confirmation email sent to verify your new email address.', 'info');
+  } catch (err) {
+    console.error('Unexpected error updating email:', err);
+    showToast('Network error while updating email.', 'error');
+  } finally {
+    setBtnLoading(saveEmailBtn, false, 'Update Email');
+  }
+}
+
+async function handleSavePassword(e) {
+  e.preventDefault();
+  if (!supabaseClient || !currentUser) return;
+
+  const newPass = settingsPasswordInput.value;
+  const confirmPass = settingsConfirmPasswordInput.value;
+
+  if (!newPass || newPass.length < 6) {
+    showToast('Password must be at least 6 characters long.', 'error');
+    return;
+  }
+
+  if (newPass !== confirmPass) {
+    showToast('Passwords do not match. Please re-enter.', 'error');
+    return;
+  }
+
+  setBtnLoading(savePasswordBtn, true, 'Update Password', 'Updating...');
+
+  try {
+    const { error } = await supabaseClient.auth.updateUser({
+      password: newPass
+    });
+
+    if (error) {
+      console.error('Error updating password:', error);
+      showToast('Failed to update password: ' + error.message, 'error');
+      return;
+    }
+
+    settingsPasswordInput.value = '';
+    settingsConfirmPasswordInput.value = '';
+    showToast('Login password updated successfully!', 'success');
+  } catch (err) {
+    console.error('Unexpected error updating password:', err);
+    showToast('Network error while updating password.', 'error');
+  } finally {
+    setBtnLoading(savePasswordBtn, false, 'Update Password');
+  }
+}
+
 // ==================== DATABASE CRUD OPERATIONS ====================
 async function fetchTasks() {
   if (!supabaseClient || !currentUser) return;
@@ -600,6 +864,7 @@ async function handleAddTask() {
   }
 
   const priority = taskPriority ? taskPriority.value : 'Medium';
+  const category = taskCategory ? taskCategory.value : 'General';
   const dueDate = taskDueDate && taskDueDate.value ? taskDueDate.value : null;
   const description = taskDescription && taskDescription.value.trim() ? taskDescription.value.trim() : null;
 
@@ -611,15 +876,29 @@ async function handleAddTask() {
       title: title,
       description: description,
       priority: priority,
+      category: category,
       status: 'Pending',
       due_date: dueDate
     };
 
-    const { data, error } = await supabaseClient
+    let { data, error } = await supabaseClient
       .from('tasks')
       .insert([newTaskPayload])
       .select()
       .single();
+
+    // Fallback if category column is not yet present in Supabase table
+    if (error && error.message && error.message.includes('category')) {
+      console.warn('Category column not detected in database. Retrying without category column...');
+      delete newTaskPayload.category;
+      const retryResult = await supabaseClient
+        .from('tasks')
+        .insert([newTaskPayload])
+        .select()
+        .single();
+      data = retryResult.data ? { ...retryResult.data, category: category } : null;
+      error = retryResult.error;
+    }
 
     if (error) {
       console.error('Error inserting task:', error);
@@ -634,6 +913,7 @@ async function handleAddTask() {
     taskInput.value = '';
     if (taskDescription) taskDescription.value = '';
     if (taskPriority) taskPriority.value = 'Medium';
+    if (taskCategory) taskCategory.value = 'General';
     if (taskDueDate) taskDueDate.value = getTodayDateString();
     if (taskOptionsPanel) taskOptionsPanel.style.display = 'none';
     if (toggleDetailsBtn) toggleDetailsBtn.classList.remove('active');
@@ -729,6 +1009,7 @@ function openEditModal(id) {
   editTaskTitle.value = task.title;
   editTaskDescription.value = task.description || '';
   editTaskPriority.value = task.priority || 'Medium';
+  if (editTaskCategory) editTaskCategory.value = task.category || 'General';
   editTaskDueDate.value = task.due_date || '';
 
   editModal.style.display = 'flex';
@@ -746,6 +1027,7 @@ async function handleSaveEditedTask(e) {
   const title = editTaskTitle.value.trim();
   const description = editTaskDescription.value.trim() || null;
   const priority = editTaskPriority.value;
+  const category = editTaskCategory ? editTaskCategory.value : 'General';
   const dueDate = editTaskDueDate.value || null;
 
   if (!title) {
@@ -757,17 +1039,33 @@ async function handleSaveEditedTask(e) {
   if (saveBtn) saveBtn.disabled = true;
 
   try {
-    const { data, error } = await supabaseClient
+    const updatePayload = {
+      title: title,
+      description: description,
+      priority: priority,
+      category: category,
+      due_date: dueDate
+    };
+
+    let { data, error } = await supabaseClient
       .from('tasks')
-      .update({
-        title: title,
-        description: description,
-        priority: priority,
-        due_date: dueDate
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();
+
+    // Fallback if category column does not exist
+    if (error && error.message && error.message.includes('category')) {
+      delete updatePayload.category;
+      const retryResult = await supabaseClient
+        .from('tasks')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+      data = retryResult.data ? { ...retryResult.data, category: category } : null;
+      error = retryResult.error;
+    }
 
     if (error) {
       console.error('Error updating task:', error);
@@ -820,16 +1118,22 @@ function getFilteredAndSortedTasks() {
     result = result.filter(t => t.status === 'Pending' && t.due_date && t.due_date < todayStr);
   }
 
-  // 3. Search Query
+  // 3. Category Filter
+  if (currentCategoryFilter && currentCategoryFilter !== 'all') {
+    result = result.filter(t => (t.category || 'General') === currentCategoryFilter);
+  }
+
+  // 4. Search Query
   if (searchQuery) {
     result = result.filter(t => {
       const matchTitle = t.title.toLowerCase().includes(searchQuery);
       const matchDesc = t.description ? t.description.toLowerCase().includes(searchQuery) : false;
-      return matchTitle || matchDesc;
+      const matchCategory = t.category ? t.category.toLowerCase().includes(searchQuery) : false;
+      return matchTitle || matchDesc || matchCategory;
     });
   }
 
-  // 4. Sorting
+  // 5. Sorting
   result.sort((a, b) => {
     if (currentSort === 'created_desc') {
       return new Date(b.created_at) - new Date(a.created_at);
@@ -862,6 +1166,9 @@ function renderTasks() {
     if (searchQuery) {
       emptyMsg = 'No matching tasks';
       emptySub = `No results found for "${escapeHTML(searchQuery)}"`;
+    } else if (currentCategoryFilter !== 'all') {
+      emptyMsg = `No ${currentCategoryFilter} tasks`;
+      emptySub = `No tasks in category "${currentCategoryFilter}"`;
     } else if (currentFilter === 'overdue' || currentView === 'overdue') {
       emptyMsg = 'No overdue tasks 🎉';
       emptySub = 'You are completely caught up!';
@@ -929,6 +1236,11 @@ function createTaskHTML(task) {
   const priorityClass = `priority-${(task.priority || 'medium').toLowerCase()}`;
   const priorityBadge = `<span class="priority-badge ${priorityClass}">${escapeHTML(task.priority || 'Medium')}</span>`;
 
+  // Category Badge
+  const category = task.category || 'General';
+  const catClass = `cat-${category.toLowerCase()}`;
+  const categoryBadge = `<span class="category-badge ${catClass}">📁 ${escapeHTML(category)}</span>`;
+
   // Optional description snippet
   const descHTML = task.description 
     ? `<span class="task-description">${escapeHTML(task.description)}</span>` 
@@ -950,6 +1262,7 @@ function createTaskHTML(task) {
         ${descHTML}
         <div class="task-meta-row">
           ${priorityBadge}
+          ${categoryBadge}
           ${dueDateBadge}
         </div>
       </div>
@@ -1034,6 +1347,13 @@ function handleFilterClick(btn) {
   currentFilter = btn.dataset.filter;
   filterBtns.forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+  renderTasks();
+}
+
+function handleCategoryPillClick(pill) {
+  currentCategoryFilter = pill.dataset.category || 'all';
+  categoryPills.forEach(p => p.classList.remove('active'));
+  pill.classList.add('active');
   renderTasks();
 }
 
